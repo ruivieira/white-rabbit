@@ -1,4 +1,9 @@
 # white-rabbit
+[![Tests](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml)
+
+<div align="center">
+  <img src="docs/white-rabbit.jpg" alt="White Rabbit" width="300" />
+</div>
 
 Deno vLLM emulator providing mock OpenAI-compatible API endpoints for testing and development.
 
