@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Node modules (if any)
+node_modules
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+white-rabbit
+
+# Documentation
+README.md
+LICENSE
+
+# CI/CD
+.github
+
+# Logs
+*.log
+
+# Test coverage
+coverage
+
+# Temporary files
+tmp
+temp

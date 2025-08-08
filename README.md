@@ -111,3 +111,27 @@ curl --request POST \
 - **Token Usage Tracking**: Returns realistic token usage statistics
 
 Any string is accepted for the `model` argument across all endpoints.
+
+## Docker
+
+### Build and Run
+
+```bash
+# Build the Docker image
+docker build -t white-rabbit .
+
+# Run the container
+docker run -p 8000:8000 white-rabbit
+
+# Run with custom port
+docker run -p 9000:8000 white-rabbit
+```
+
+### Docker Features
+
+- **Multi-stage build**: Uses UBI9 as builder base for security and compliance
+- **Compiled binary**: Compiles Deno application to a single executable binary
+- **Minimal runtime**: Final image uses UBI9 minimal for reduced attack surface
+- **Non-root user**: Runs as dedicated `whiterabbit` user for security
+- **Health check**: Built-in health check endpoint monitoring
+- **Optimised layers**: Efficient Docker layer caching for faster rebuilds
