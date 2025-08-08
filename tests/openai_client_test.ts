@@ -8,7 +8,7 @@ async function startTestServer(): Promise<{ port: number; controller: AbortContr
   const controller = new AbortController();
   const port = 8001; // Use different port for tests
 
-  const server = serve(handleRequest, {
+  const _server = serve(handleRequest, {
     port,
     signal: controller.signal,
     onListen: () => {}, // Suppress listen message
