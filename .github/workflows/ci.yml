@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.4.3
+
+      - name: Verify formatting
+        run: deno fmt --check
+
+      - name: Run linter
+        run: deno lint
+
+      - name: Type check
+        run: deno check src/**/*.ts tests/**/*.ts
+
+      - name: Run tests
+        run: deno test -A tests/
+
+      - name: Test server startup
+        run: |
+          # Start server in background
+          deno run -A src/server.ts &
+          SERVER_PID=$!
+
+          # Wait for server to start
+          sleep 2
+
+          # Test health endpoint
+          curl -f http://localhost:8000/health
+
+          # Test chat completions endpoint
+          curl -f -X POST http://localhost:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{"model":"test","messages":[{"role":"user","content":"test"}],"max_tokens":10}'
+
+          # Test completions endpoint
+          curl -f -X POST http://localhost:8000/v1/completions \
+            -H "Content-Type: application/json" \
+            -d '{"model":"test","prompt":"test","max_tokens":10}'
+
+          # Clean up
+          kill $SERVER_PID

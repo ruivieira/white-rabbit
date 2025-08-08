@@ -31,7 +31,7 @@ async function parseJson<T>(req: Request): Promise<T | null> {
   }
 }
 
-serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") {
     return json({ status: "ok" });
@@ -55,7 +55,11 @@ serve(async (req) => {
     for (let i = 0; i < n; i++) {
       const { text, hitMaxLength } = genParagraph(maxTokens);
 
-      let logprobs: { content: Array<{ token: string; logprob: number; bytes: unknown[]; top_logprobs: unknown[] }> } | null = null;
+      let logprobs: {
+        content: Array<
+          { token: string; logprob: number; bytes: unknown[]; top_logprobs: unknown[] }
+        >;
+      } | null = null;
       if (wantLogprobs) {
         logprobs = { content: [] };
         for (const word of text.split(/\s+/)) {
@@ -101,7 +105,9 @@ serve(async (req) => {
     const maxTokens = body.max_tokens ?? null;
     const wantLogprobs = Boolean(body.logprobs);
 
-    const promptStr = Array.isArray(body.prompt) ? (body.prompt[0] ?? "") : String(body.prompt ?? "");
+    const promptStr = Array.isArray(body.prompt)
+      ? (body.prompt[0] ?? "")
+      : String(body.prompt ?? "");
 
     const choices: unknown[] = [];
 
@@ -109,7 +115,12 @@ serve(async (req) => {
       let { text, hitMaxLength } = genParagraph(maxTokens);
       if (body.echo) text = promptStr + text;
 
-      let logprobs: { text_offset: number[]; token_logprobs: number[]; tokens: string[]; top_logprobs: Record<string, number>[] } | null = null;
+      let logprobs: {
+        text_offset: number[];
+        token_logprobs: number[];
+        tokens: string[];
+        top_logprobs: Record<string, number>[];
+      } | null = null;
       if (wantLogprobs) {
         const tokens = text.split(/(\s+)/);
         const text_offset: number[] = [];
@@ -147,4 +158,9 @@ serve(async (req) => {
   }
 
   return json({ error: "Not found" }, 404);
-}, { port: 8000 });
+}
+
+// Only start server if this is the main module
+if (import.meta.main) {
+  serve(handleRequest, { port: 8000 });
+}

@@ -1,6 +1,6 @@
 # white-rabbit
 
-Deno vLLM emulator providing mock `/v1/completions` and `/v1/chat/completions` endpoints, mirroring the Python `vllm_emulator`.
+Deno vLLM emulator providing mock `/v1/completions` and `/v1/chat/completions` endpoints.
 
 ## Run locally
 

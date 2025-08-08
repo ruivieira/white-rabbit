@@ -1,11 +1,25 @@
 {
   "tasks": {
     "dev": "deno run -A --watch src/server.ts",
-    "start": "deno run -A src/server.ts"
+    "start": "deno run -A src/server.ts",
+    "test": "deno test -A tests/",
+    "test:watch": "deno test -A --watch tests/",
+    "fmt": "deno fmt",
+    "fmt:check": "deno fmt --check",
+    "lint": "deno lint",
+    "check": "deno check src/**/*.ts tests/**/*.ts"
+  },
+  "imports": {
+    "@openai/openai": "jsr:@openai/openai@^4.73.1"
   },
   "fmt": {
     "useTabs": false,
     "lineWidth": 100,
     "indentWidth": 2
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
   }
 }
