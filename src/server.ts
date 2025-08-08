@@ -1,0 +1,150 @@
+import { genParagraph } from "./text_generation.ts";
+import { ChatCompletionsRequest, CompletionsRequest } from "./api.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function uuidHex(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
+
+function systemFingerprint(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function countWords(text: string): number {
+  return text.trim().length ? text.trim().split(/\s+/).length : 0;
+}
+
+async function parseJson<T>(req: Request): Promise<T | null> {
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
+}
+
+serve(async (req) => {
+  const url = new URL(req.url);
+  if (req.method === "GET" && url.pathname === "/health") {
+    return json({ status: "ok" });
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
+    const body = await parseJson<ChatCompletionsRequest>(req);
+    if (!body || !body.model || !Array.isArray(body.messages)) {
+      return json({ error: "Invalid request body" }, 400);
+    }
+
+    const n = body.n ?? 1;
+    const maxTokens = body.max_tokens ?? null;
+    const wantLogprobs = Boolean(body.logprobs);
+
+    const promptTokens = body.messages.reduce((acc, m) => acc + countWords(m.content ?? ""), 0);
+
+    const choices: unknown[] = [];
+    let generatedTokens = 0;
+
+    for (let i = 0; i < n; i++) {
+      const { text, hitMaxLength } = genParagraph(maxTokens);
+
+      let logprobs: { content: Array<{ token: string; logprob: number; bytes: unknown[]; top_logprobs: unknown[] }> } | null = null;
+      if (wantLogprobs) {
+        logprobs = { content: [] };
+        for (const word of text.split(/\s+/)) {
+          const lp = -Math.random();
+          logprobs.content.push({ token: word, logprob: lp, bytes: [], top_logprobs: [] });
+        }
+      }
+
+      generatedTokens += text.trim().length ? text.trim().split(/\s+/).length : 0;
+      choices.push({
+        index: i,
+        message: { role: "assistant", content: text, refusal: null },
+        logprobs,
+        finish_reason: hitMaxLength ? "length" : "stop",
+      });
+    }
+
+    const resp = {
+      id: "chat_completion_" + uuidHex(),
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: body.model,
+      system_fingerprint: systemFingerprint(),
+      choices,
+      usage: {
+        prompt_tokens: promptTokens,
+        total_tokens: promptTokens + generatedTokens,
+        completion_tokens: generatedTokens,
+        prompt_tokens_details: null,
+      },
+      prompt_logprobs: null,
+    };
+    return json(resp);
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/completions") {
+    const body = await parseJson<CompletionsRequest>(req);
+    if (!body || !body.model || typeof body.prompt === "undefined") {
+      return json({ error: "Invalid request body" }, 400);
+    }
+
+    const n = body.n ?? 1;
+    const maxTokens = body.max_tokens ?? null;
+    const wantLogprobs = Boolean(body.logprobs);
+
+    const promptStr = Array.isArray(body.prompt) ? (body.prompt[0] ?? "") : String(body.prompt ?? "");
+
+    const choices: unknown[] = [];
+
+    for (let i = 0; i < n; i++) {
+      let { text, hitMaxLength } = genParagraph(maxTokens);
+      if (body.echo) text = promptStr + text;
+
+      let logprobs: { text_offset: number[]; token_logprobs: number[]; tokens: string[]; top_logprobs: Record<string, number>[] } | null = null;
+      if (wantLogprobs) {
+        const tokens = text.split(/(\s+)/);
+        const text_offset: number[] = [];
+        const token_logprobs: number[] = [];
+        const top_logprobs: Record<string, number>[] = [];
+        let offset = 0;
+        for (const tok of tokens) {
+          text_offset.push(offset);
+          offset += tok.length;
+          const lp = -Math.random();
+          token_logprobs.push(lp);
+          top_logprobs.push({ [tok]: lp });
+        }
+        logprobs = { text_offset, token_logprobs, tokens, top_logprobs };
+      }
+
+      choices.push({
+        index: i,
+        text,
+        logprobs,
+        finish_reason: hitMaxLength ? "length" : "stop",
+      });
+    }
+
+    const resp = {
+      id: "chat_completion_" + uuidHex(),
+      object: "chat.completion",
+      created: Date.now() / 1000,
+      model: body.model,
+      system_fingerprint: systemFingerprint(),
+      choices,
+      usage: {},
+    };
+    return json(resp);
+  }
+
+  return json({ error: "Not found" }, 404);
+}, { port: 8000 });

@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "dev": "deno run -A --watch src/server.ts",
+    "start": "deno run -A src/server.ts"
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2
+  }
+}
