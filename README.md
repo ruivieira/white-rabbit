@@ -17,15 +17,19 @@ deno task start
 White Rabbit provides mock implementations of the following OpenAI-compatible endpoints:
 
 ### Health Check
+
 - `GET /health` - Returns server status
 
 ### Chat Completions
+
 - `POST /v1/chat/completions` - Generate chat completions
 
 ### Completions (Legacy)
+
 - `POST /v1/completions` - Generate text completions
 
 ### Embeddings
+
 - `POST /v1/embeddings` - Generate text embeddings
 
 ## Usage Examples
@@ -97,10 +101,12 @@ curl --request POST \
 
 ## Features
 
-- **Mock Data Generation**: Generates realistic-looking mock responses with random text and embeddings
+- **Mock Data Generation**: Generates realistic-looking mock responses with random text and
+  embeddings
 - **OpenAI API Compatibility**: Follows OpenAI API specifications for request/response formats
 - **Multiple Input Support**: Supports single strings, arrays of strings, and token ID arrays
-- **Configurable Parameters**: Supports parameters like `max_tokens`, `n`, `logprobs`, `dimensions`, etc.
+- **Configurable Parameters**: Supports parameters like `max_tokens`, `n`, `logprobs`, `dimensions`,
+  etc.
 - **Normalised Embeddings**: Generated embeddings are unit vectors (normalised to length 1)
 - **Token Usage Tracking**: Returns realistic token usage statistics
 

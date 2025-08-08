@@ -26,10 +26,10 @@ function countWords(text: string): number {
 function generateMockEmbedding(dimensions = 384): number[] {
   // Generate a normalised random vector
   const embedding = Array.from({ length: dimensions }, () => Math.random() - 0.5);
-  
+
   // Normalise to unit length (common for embeddings)
   const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-  return embedding.map(val => val / magnitude);
+  return embedding.map((val) => val / magnitude);
 }
 
 async function parseJson<T>(req: Request): Promise<T | null> {
@@ -180,7 +180,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       if (body.input.length === 0) {
         return json({ error: "Input cannot be empty" }, 400);
       }
-      
+
       // Handle both string arrays and token ID arrays
       if (typeof body.input[0] === "string") {
         inputs = body.input as string[];
@@ -213,7 +213,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         total_tokens: totalTokens,
       },
     };
-    
+
     return json(resp);
   }
 

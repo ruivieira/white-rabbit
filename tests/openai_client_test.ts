@@ -321,7 +321,7 @@ Deno.test("OpenAI client - embeddings with multiple inputs", async () => {
     const inputs = [
       "First text to embed",
       "Second text to embed",
-      "Third text to embed"
+      "Third text to embed",
     ];
 
     const embedding = await client.embeddings.create({
@@ -331,17 +331,20 @@ Deno.test("OpenAI client - embeddings with multiple inputs", async () => {
     });
 
     assertEquals(embedding.data.length, 3);
-    
+
     embedding.data.forEach((data, index) => {
       assertEquals(data.index, index);
       assertEquals(data.object, "embedding");
       assertExists(data.embedding);
       assert(Array.isArray(data.embedding));
       assertEquals(data.embedding.length, 384);
-      
+
       // Verify embedding is normalised (unit vector)
       const magnitude = Math.sqrt(data.embedding.reduce((sum, val) => sum + val * val, 0));
-      assert(Math.abs(magnitude - 1.0) < 0.001, `Embedding should be normalised, got magnitude ${magnitude}`);
+      assert(
+        Math.abs(magnitude - 1.0) < 0.001,
+        `Embedding should be normalised, got magnitude ${magnitude}`,
+      );
     });
   } finally {
     controller.abort();
