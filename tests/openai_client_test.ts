@@ -41,7 +41,7 @@ Deno.test("OpenAI client - chat completions", async () => {
     // Verify response structure matches OpenAI API
     assertExists(completion.id);
     assertEquals(completion.object, "chat.completion");
-    assertEquals(completion.model, "test-model");
+    assertEquals(completion.model, "Qwen/Qwen2.5-1.5B-Instruct");
     assertExists(completion.created);
     assertExists(completion.system_fingerprint);
     assertEquals(completion.choices.length, 1);
@@ -143,7 +143,7 @@ Deno.test("OpenAI client - completions", async () => {
 
     assertExists(completion.id);
     assertEquals(completion.object, "chat.completion"); // Our emulator returns this
-    assertEquals(completion.model, "test-model");
+    assertEquals(completion.model, "Qwen/Qwen2.5-1.5B-Instruct");
     assertExists(completion.created);
     assertEquals(completion.choices.length, 1);
 
@@ -290,7 +290,7 @@ Deno.test("OpenAI client - embeddings", async () => {
     assertExists(embeddingData.id);
     assert(embeddingData.id.startsWith("embd-"));
     assertEquals(embedding.object, "list");
-    assertEquals(embedding.model, "test-embedding-model");
+    assertEquals(embedding.model, "Qwen/Qwen2.5-1.5B-Instruct");
     assertExists(embeddingData.created);
     assertEquals(embedding.data.length, 1);
 

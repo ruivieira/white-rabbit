@@ -39,7 +39,7 @@ Deno.test("Chat completions endpoint - basic request", async () => {
   const data = await response.json();
   assertExists(data.id);
   assertEquals(data.object, "chat.completion");
-  assertEquals(data.model, "test-model");
+  assertEquals(data.model, "Qwen/Qwen2.5-1.5B-Instruct");
   assertExists(data.created);
   assertExists(data.system_fingerprint);
   assertEquals(data.choices.length, 1);
@@ -130,7 +130,7 @@ Deno.test("Completions endpoint - basic request", async () => {
   const data = await response.json();
   assertExists(data.id);
   assertEquals(data.object, "chat.completion");
-  assertEquals(data.model, "test-model");
+  assertEquals(data.model, "Qwen/Qwen2.5-1.5B-Instruct");
   assertExists(data.created);
   assertExists(data.system_fingerprint);
   assertEquals(data.choices.length, 1);

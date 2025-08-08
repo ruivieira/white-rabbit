@@ -2,6 +2,11 @@ import { genParagraph } from "./text_generation.ts";
 import { ChatCompletionsRequest, CompletionsRequest, EmbeddingRequest } from "./api.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+// Get model name from environment variable, with fallback to default
+function getModelName(_requestModel: string): string {
+  return Deno.env.get("WR_MODEL") || "Qwen/Qwen2.5-1.5B-Instruct";
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -90,7 +95,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       id: "chat_completion_" + uuidHex(),
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
-      model: body.model,
+      model: getModelName(body.model),
       system_fingerprint: systemFingerprint(),
       choices,
       usage: {
@@ -158,7 +163,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       id: "chat_completion_" + uuidHex(),
       object: "chat.completion",
       created: Date.now() / 1000,
-      model: body.model,
+      model: getModelName(body.model),
       system_fingerprint: systemFingerprint(),
       choices,
       usage: {},
@@ -206,7 +211,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       id: "embd-" + uuidHex(),
       object: "list",
       created: Math.floor(Date.now() / 1000),
-      model: body.model,
+      model: getModelName(body.model),
       data,
       usage: {
         prompt_tokens: totalTokens,

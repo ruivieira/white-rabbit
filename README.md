@@ -15,6 +15,25 @@ cd /home/rui/Sync/code/typescript/white-rabbit
 deno task dev
 # or
 deno task start
+
+# Run with custom model name
+WR_MODEL="my-custom-model" deno task start
+```
+
+## Configuration
+
+### Environment Variables
+
+- `WR_MODEL` - Override the model name returned in API responses. If not set, defaults to `Qwen/Qwen2.5-1.5B-Instruct`.
+
+Example:
+```bash
+# Set model name to "granite-3.1-8b"
+export WR_MODEL="granite-3.1-8b"
+deno task start
+
+# Or inline
+WR_MODEL="granite-3.1-8b" deno task start
 ```
 
 ## Supported Endpoints
@@ -115,7 +134,7 @@ curl --request POST \
 - **Normalised Embeddings**: Generated embeddings are unit vectors (normalised to length 1)
 - **Token Usage Tracking**: Returns realistic token usage statistics
 
-Any string is accepted for the `model` argument across all endpoints.
+Any string is accepted for the `model` argument across all endpoints. However, the actual model name returned in responses is determined by the `WR_MODEL` environment variable (or the default `Qwen/Qwen2.5-1.5B-Instruct` if not set), regardless of what the client requests.
 
 ## Docker
 
@@ -130,6 +149,9 @@ docker run -p 8000:8000 white-rabbit
 
 # Run with custom port
 docker run -p 9000:8000 white-rabbit
+
+# Run with custom model name
+docker run -p 8000:8000 -e WR_MODEL="granite-3.1-8b" white-rabbit
 ```
 
 ### Docker Features
