@@ -1,5 +1,5 @@
 import { genParagraph } from "./text_generation.ts";
-import { ChatCompletionsRequest, CompletionsRequest } from "./api.ts";
+import { ChatCompletionsRequest, CompletionsRequest, EmbeddingRequest } from "./api.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 function json(body: unknown, status = 200): Response {
@@ -21,6 +21,15 @@ function systemFingerprint(): string {
 
 function countWords(text: string): number {
   return text.trim().length ? text.trim().split(/\s+/).length : 0;
+}
+
+function generateMockEmbedding(dimensions = 384): number[] {
+  // Generate a normalised random vector
+  const embedding = Array.from({ length: dimensions }, () => Math.random() - 0.5);
+  
+  // Normalise to unit length (common for embeddings)
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  return embedding.map(val => val / magnitude);
 }
 
 async function parseJson<T>(req: Request): Promise<T | null> {
@@ -154,6 +163,57 @@ export async function handleRequest(req: Request): Promise<Response> {
       choices,
       usage: {},
     };
+    return json(resp);
+  }
+
+  if (req.method === "POST" && url.pathname === "/v1/embeddings") {
+    const body = await parseJson<EmbeddingRequest>(req);
+    if (!body || !body.model || !body.input) {
+      return json({ error: "Invalid request body" }, 400);
+    }
+
+    // Convert input to array of strings
+    let inputs: string[] = [];
+    if (typeof body.input === "string") {
+      inputs = [body.input];
+    } else if (Array.isArray(body.input)) {
+      if (body.input.length === 0) {
+        return json({ error: "Input cannot be empty" }, 400);
+      }
+      
+      // Handle both string arrays and token ID arrays
+      if (typeof body.input[0] === "string") {
+        inputs = body.input as string[];
+      } else if (typeof body.input[0] === "number") {
+        // For token arrays, create a mock string representation
+        inputs = ["<token_sequence>"];
+      } else if (Array.isArray(body.input[0])) {
+        // For nested token arrays, create mock strings for each sequence
+        inputs = (body.input as number[][]).map(() => "<token_sequence>");
+      }
+    }
+
+    const dimensions = body.dimensions ?? 384;
+    const data = inputs.map((_input, index) => ({
+      object: "embedding" as const,
+      embedding: generateMockEmbedding(dimensions),
+      index,
+    }));
+
+    const totalTokens = inputs.reduce((acc, input) => acc + countWords(input), 0);
+
+    const resp = {
+      id: "embd-" + uuidHex(),
+      object: "list",
+      created: Math.floor(Date.now() / 1000),
+      model: body.model,
+      data,
+      usage: {
+        prompt_tokens: totalTokens,
+        total_tokens: totalTokens,
+      },
+    };
+    
     return json(resp);
   }
 

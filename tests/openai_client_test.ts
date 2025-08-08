@@ -268,3 +268,130 @@ Deno.test("OpenAI client - streaming not supported", async () => {
     controller.abort();
   }
 });
+
+Deno.test("OpenAI client - embeddings", async () => {
+  const { port, controller } = await startTestServer();
+
+  try {
+    const client = new OpenAI({
+      apiKey: "fake-key",
+      baseURL: `http://localhost:${port}/v1`,
+    });
+
+    const embedding = await client.embeddings.create({
+      model: "test-embedding-model",
+      input: "The quick brown fox jumps over the lazy dog",
+      encoding_format: "float",
+    });
+
+    // Verify response structure matches OpenAI API
+    const embeddingData = embedding as any; // Cast to access all properties
+    assertExists(embeddingData.id);
+    assert(embeddingData.id.startsWith("embd-"));
+    assertEquals(embedding.object, "list");
+    assertEquals(embedding.model, "test-embedding-model");
+    assertExists(embeddingData.created);
+    assertEquals(embedding.data.length, 1);
+
+    const data = embedding.data[0];
+    assertEquals(data.index, 0);
+    assertEquals(data.object, "embedding");
+    assertExists(data.embedding);
+    assert(Array.isArray(data.embedding));
+    assertEquals(data.embedding.length, 384); // Default dimensions
+
+    assertExists(embedding.usage);
+    assert(typeof embedding.usage.prompt_tokens === "number");
+    assert(typeof embedding.usage.total_tokens === "number");
+    assertEquals(embedding.usage.prompt_tokens, embedding.usage.total_tokens);
+  } finally {
+    controller.abort();
+  }
+});
+
+Deno.test("OpenAI client - embeddings with multiple inputs", async () => {
+  const { port, controller } = await startTestServer();
+
+  try {
+    const client = new OpenAI({
+      apiKey: "fake-key",
+      baseURL: `http://localhost:${port}/v1`,
+    });
+
+    const inputs = [
+      "First text to embed",
+      "Second text to embed",
+      "Third text to embed"
+    ];
+
+    const embedding = await client.embeddings.create({
+      model: "test-embedding-model",
+      input: inputs,
+      encoding_format: "float",
+    });
+
+    assertEquals(embedding.data.length, 3);
+    
+    embedding.data.forEach((data, index) => {
+      assertEquals(data.index, index);
+      assertEquals(data.object, "embedding");
+      assertExists(data.embedding);
+      assert(Array.isArray(data.embedding));
+      assertEquals(data.embedding.length, 384);
+      
+      // Verify embedding is normalised (unit vector)
+      const magnitude = Math.sqrt(data.embedding.reduce((sum, val) => sum + val * val, 0));
+      assert(Math.abs(magnitude - 1.0) < 0.001, `Embedding should be normalised, got magnitude ${magnitude}`);
+    });
+  } finally {
+    controller.abort();
+  }
+});
+
+Deno.test("OpenAI client - embeddings with custom dimensions", async () => {
+  const { port, controller } = await startTestServer();
+
+  try {
+    const client = new OpenAI({
+      apiKey: "fake-key",
+      baseURL: `http://localhost:${port}/v1`,
+    });
+
+    const embedding = await client.embeddings.create({
+      model: "test-embedding-model",
+      input: "Test text",
+      encoding_format: "float",
+      dimensions: 768,
+    });
+
+    assertEquals(embedding.data.length, 1);
+    assertEquals(embedding.data[0].embedding.length, 768);
+  } finally {
+    controller.abort();
+  }
+});
+
+Deno.test("OpenAI client - embeddings error handling", async () => {
+  const { port, controller } = await startTestServer();
+
+  try {
+    const client = new OpenAI({
+      apiKey: "fake-key",
+      baseURL: `http://localhost:${port}/v1`,
+    });
+
+    // Test invalid request (missing input)
+    try {
+      await client.embeddings.create({
+        model: "test-model",
+        // @ts-expect-error Testing invalid request
+        input: undefined,
+      });
+      assert(false, "Should have thrown an error");
+    } catch (error) {
+      assert(error instanceof Error);
+    }
+  } finally {
+    controller.abort();
+  }
+});
