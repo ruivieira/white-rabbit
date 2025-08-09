@@ -127,6 +127,7 @@ const GLOBAL_CHAIN = buildGlobalChain(corpus);
 export function generateCorpusMarkovAnswer(
   prompt: string,
   maxTokens: number | null | undefined,
+  respectMaxTokens: boolean = true,
 ): { text: string; hitMaxLength: boolean } {
   const { startCounts, transitions, tokenCounts } = GLOBAL_CHAIN;
   const limit = typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 40;
@@ -151,19 +152,28 @@ export function generateCorpusMarkovAnswer(
   while (outTokens.length < limit) {
     const next = nextToken(current, transitions, recentTokens);
     if (!next) {
-      // If we can't continue from current token and we have no output yet,
-      // try to find a better starting token
-      if (outTokens.length === 0) {
-        // Find a random token that has good continuations
-        const tokensWithGoodContinuations = Array.from(transitions.keys()).filter(token => {
+      // When we can't continue, find a random token with good continuations
+      // This ensures we keep generating until we hit max_tokens
+      const tokensWithGoodContinuations = Array.from(transitions.keys()).filter(token => {
+        const nextOptions = transitions.get(token);
+        if (!nextOptions) return false;
+        const nonPunctuation = Array.from(nextOptions.keys()).filter(t => !isPunctuationToken(t));
+        return nonPunctuation.length >= 1; // Has at least 1 non-punctuation option
+      });
+      
+      if (tokensWithGoodContinuations.length > 0) {
+        // Choose a random token with good continuations
+        current = tokensWithGoodContinuations[Math.floor(Math.random() * tokensWithGoodContinuations.length)];
+        continue;
+      } else {
+        // Fallback: choose any random token that has continuations
+        const anyTokensWithContinuations = Array.from(transitions.keys()).filter(token => {
           const nextOptions = transitions.get(token);
-          if (!nextOptions) return false;
-          const nonPunctuation = Array.from(nextOptions.keys()).filter(t => !isPunctuationToken(t));
-          return nonPunctuation.length > 1; // Has at least 2 non-punctuation options
+          return nextOptions && nextOptions.size > 0;
         });
         
-        if (tokensWithGoodContinuations.length > 0) {
-          current = tokensWithGoodContinuations[Math.floor(Math.random() * tokensWithGoodContinuations.length)];
+        if (anyTokensWithContinuations.length > 0) {
+          current = anyTokensWithContinuations[Math.floor(Math.random() * anyTokensWithContinuations.length)];
           continue;
         }
       }
@@ -181,7 +191,8 @@ export function generateCorpusMarkovAnswer(
     }
 
     current = next;
-    if (isPunctuationToken(next)) break;
+    // Only stop at punctuation if we're not strictly respecting max tokens
+    if (!respectMaxTokens && isPunctuationToken(next)) break;
   }
   if (outTokens.length >= limit) hitMax = true;
 

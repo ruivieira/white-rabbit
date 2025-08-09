@@ -145,3 +145,27 @@ Deno.test("Markov generation - prompt word continuation", () => {
       `For prompt "${prompt}", generated text "${result.text}" should not start with "${lastPromptToken}"`);
   }
 });
+
+Deno.test("Markov generation - 95% max tokens requirement", () => {
+  const testCases = [
+    { prompt: "Science and technology", maxTokens: 30 },
+    { prompt: "Philosophy explores the nature", maxTokens: 25 },
+    { prompt: "Art and culture throughout history", maxTokens: 35 },
+  ];
+  
+  for (const { prompt, maxTokens } of testCases) {
+    const result = generateCorpusMarkovAnswer(prompt, maxTokens);
+    const tokens = result.text.trim().split(/\s+/);
+    
+    assert(tokens.length <= maxTokens, 
+      `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+    
+    // With aggressive fallback, should generate at least 95% of max_tokens
+    assert(tokens.length >= maxTokens * 0.95, 
+      `Prompt "${prompt}": Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${Math.round(tokens.length/maxTokens*100)}%)`);
+    
+    // Should hit the length limit due to aggressive fallback
+    assertEquals(result.hitMaxLength, true, 
+      `Prompt "${prompt}": Should hit max length with aggressive fallback`);
+  }
+});
