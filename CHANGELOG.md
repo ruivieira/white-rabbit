@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add CHANGELOG.md for project documentation; implement changelog generation tool and update deno.json with changelog command; modify logger prefix for improved clarity ([fe0453b])
 - Introduce logging utilities for enhanced server monitoring; update README with logging configuration details and usage examples; improve server stats logging for better performance insights ([6486ece])
 - Bump version to 0.2.1; expand corpus with additional historical and cultural entries; enhance Markov generation logic to respect max token limits and improve fallback behavior; add tests for max token requirements in completions endpoint ([61606ed])
 - Enhance Markov text generation with improved token selection logic and add comprehensive tests for functionality and edge cases ([9e67d3d])
