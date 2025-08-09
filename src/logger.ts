@@ -18,7 +18,7 @@ export interface LoggerConfig {
 
 const DEFAULT_CONFIG: LoggerConfig = {
   level: LogLevel.DEBUG,
-  prefix: "WHITE_RABBIT",
+  prefix: "🐰",
   enableColors: true,
   dateFormat: "MM-DD HH:mm:ss",
 };
