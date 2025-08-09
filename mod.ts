@@ -14,4 +14,4 @@ export { genParagraph } from "./src/text_generation.ts";
 export { generateCorpusMarkovAnswer } from "./src/markov.ts";
 
 // Export version information
-export { getVersionInfo, WHITE_RABBIT_VERSION, VLLM_VERSION } from "./src/version.ts";
+export { getVersionInfo, VLLM_VERSION, WHITE_RABBIT_VERSION } from "./src/version.ts";

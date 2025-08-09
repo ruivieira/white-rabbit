@@ -39,7 +39,7 @@ function weightedRandomChoice<T>(items: T[], weights: number[]): T | null {
   if (items.length === 0 || weights.length === 0) return null;
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   if (totalWeight === 0) return items[0];
-  
+
   let random = Math.random() * totalWeight;
   for (let i = 0; i < items.length; i++) {
     random -= weights[i];
@@ -48,21 +48,25 @@ function weightedRandomChoice<T>(items: T[], weights: number[]): T | null {
   return items[items.length - 1];
 }
 
-function nextToken(current: string, transitions: TransitionCounts, recentTokens: Set<string>): string | null {
+function nextToken(
+  current: string,
+  transitions: TransitionCounts,
+  recentTokens: Set<string>,
+): string | null {
   const map = transitions.get(current);
   if (!map || map.size === 0) return null;
-  
+
   // Get all possible next tokens and their counts
   const candidates: string[] = [];
   const weights: number[] = [];
-  
+
   for (const [token, count] of map.entries()) {
     candidates.push(token);
     // Penalise recently used tokens to reduce repetition
     const penalty = recentTokens.has(token) ? 0.1 : 1.0;
     weights.push(count * penalty);
   }
-  
+
   // Use weighted random selection instead of always picking the most probable
   return weightedRandomChoice(candidates, weights);
 }
@@ -128,14 +132,14 @@ export function generateCorpusMarkovAnswer(
   const outTokens: string[] = [current];
   const recentTokens = new Set<string>();
   const RECENT_WINDOW = 5; // Track last 5 tokens to avoid repetition
-  
+
   let hitMax = false;
   while (outTokens.length < limit) {
     const next = nextToken(current, transitions, recentTokens);
     if (!next) break;
-    
+
     outTokens.push(next);
-    
+
     // Update recent tokens window
     recentTokens.add(next);
     if (recentTokens.size > RECENT_WINDOW) {
@@ -143,7 +147,7 @@ export function generateCorpusMarkovAnswer(
       const tokensArray = Array.from(recentTokens);
       recentTokens.delete(tokensArray[0]);
     }
-    
+
     current = next;
     if (isPunctuationToken(next)) break;
   }
@@ -161,5 +165,3 @@ export function generateCorpusMarkovAnswer(
   if (text.length > 0) text = text[0].toUpperCase() + text.slice(1);
   return { text, hitMaxLength: hitMax };
 }
-
-

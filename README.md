@@ -221,8 +221,8 @@ curl --request GET \
 
 - **Mock Data Generation**: Generates realistic-looking mock responses with random text and
   embeddings
-- **Markov completions**: Uses a small QA dataset and a weighted Markov chain to produce
-  more topic-relevant answers for `/v1/completions` and `/v1/chat/completions`.
+- **Markov completions**: Uses a small QA dataset and a weighted Markov chain to produce more
+  topic-relevant answers for `/v1/completions` and `/v1/chat/completions`.
 - **OpenAI API Compatibility**: Follows OpenAI API specifications for request/response formats
 - **Multiple Input Support**: Supports single strings, arrays of strings, and token ID arrays
 - **Configurable Parameters**: Supports parameters like `max_tokens`, `n`, `logprobs`, `dimensions`,

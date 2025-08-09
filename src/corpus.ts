@@ -274,7 +274,5 @@ export const corpus: string[] = [
   "The city of Bucharest is the capital of Romania and the country's largest city and industrial centre.",
   "Big data analytics processes large volumes of data to uncover patterns and insights for decision-making.",
   "The city of Sofia is the capital of Bulgaria and is located in the Sofia Valley at the foot of Vitosha mountain.",
-  "Edge computing brings computation and data storage closer to the sources of data to reduce latency."
+  "Edge computing brings computation and data storage closer to the sources of data to reduce latency.",
 ];
-
-
