@@ -8,7 +8,7 @@ ci:
     updates:
     - [{repo}]({homepage}) {old_rev} → {new_rev}
   autoupdate_schedule: weekly
-  skip: [deno-test, changelog-generation] # Skip heavy operations in CI
+  skip: [deno-fmt, deno-lint, deno-check, deno-test, changelog-generation] # Skip Deno operations - not available in CI
   submodules: false
 
 # Specific settings for pre-commit.ci
@@ -18,26 +18,26 @@ repos:
       - id: deno-fmt
         name: Deno Format
         description: Format TypeScript/JavaScript code with Deno
-        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno fmt'
+        entry: bash -c 'if ! command -v deno &> /dev/null; then curl -fsSL https://deno.land/x/install/install.sh | sh -s v1.45.5; export PATH="$HOME/.deno/bin:$PATH"; fi; deno fmt'
         language: system
         files: \.(ts|js|tsx|jsx|json|jsonc|md)$
         pass_filenames: false
       - id: deno-lint
         name: Deno Lint
         description: Lint TypeScript/JavaScript code with Deno
-        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno lint'
+        entry: bash -c 'if ! command -v deno &> /dev/null; then curl -fsSL https://deno.land/x/install/install.sh | sh -s v1.45.5; export PATH="$HOME/.deno/bin:$PATH"; fi; deno lint'
         language: system
         files: \.(ts|js|tsx|jsx)$
         pass_filenames: false
       - id: deno-check
         name: Deno Type Check
-        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno check src/**/*.ts tests/**/*.ts'
+        entry: bash -c 'if ! command -v deno &> /dev/null; then curl -fsSL https://deno.land/x/install/install.sh | sh -s v1.45.5; export PATH="$HOME/.deno/bin:$PATH"; fi; deno check src/**/*.ts tests/**/*.ts'
         language: system
         files: \.(ts|tsx)$
         pass_filenames: false
       - id: deno-test
         name: Deno Test
-        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno test -A tests/'
+        entry: bash -c 'if ! command -v deno &> /dev/null; then curl -fsSL https://deno.land/x/install/install.sh | sh -s v1.45.5; export PATH="$HOME/.deno/bin:$PATH"; fi; deno test -A tests/'
         language: system
         files: \.(ts|tsx)$
         pass_filenames: false
