@@ -1,6 +1,8 @@
 # white-rabbit
 
 [![Tests](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml)
+[![JSR](https://jsr.io/badges/@rui/white-rabbit)](https://jsr.io/@rui/white-rabbit)
+[![JSR Score](https://jsr.io/badges/@rui/white-rabbit/score)](https://jsr.io/@rui/white-rabbit)
 
 <div align="center">
   <img src="docs/white-rabbit.jpg" alt="White Rabbit" width="300" />
