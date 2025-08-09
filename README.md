@@ -24,10 +24,10 @@ const mockText = genParagraph(5);
 
 ```typescript
 // Import API types
-import type { 
+import type {
   ChatCompletionsRequest,
   CompletionsRequest,
-  EmbeddingRequest 
+  EmbeddingRequest,
 } from "jsr:@rui/white-rabbit/api";
 
 // Import text generation utilities
