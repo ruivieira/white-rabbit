@@ -7,7 +7,7 @@
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ruivieira/white-rabbit/main.svg)](https://results.pre-commit.ci/latest/github/ruivieira/white-rabbit/main)
 
 <div align="center">
-  <img src="docs/white-rabbit.jpg" alt="White Rabbit" width="300" />
+  <img src="docs/white-rabbit.png" alt="White Rabbit" width="300" />
 </div>
 
 Deno vLLM emulator providing mock OpenAI-compatible API endpoints for testing and development.
