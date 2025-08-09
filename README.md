@@ -4,6 +4,7 @@
 [![JSR](https://jsr.io/badges/@rui/white-rabbit)](https://jsr.io/@rui/white-rabbit)
 [![JSR Score](https://jsr.io/badges/@rui/white-rabbit/score)](https://jsr.io/@rui/white-rabbit)
 [![quay.io](https://quay.io/repository/ruimvieira/white-rabbit/status "Docker Repository on Quay")](https://quay.io/repository/ruimvieira/white-rabbit)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ruivieira/white-rabbit/main.svg)](https://results.pre-commit.ci/latest/github/ruivieira/white-rabbit/main)
 
 <div align="center">
   <img src="docs/white-rabbit.jpg" alt="White Rabbit" width="300" />
