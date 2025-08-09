@@ -273,11 +273,13 @@ Deno.test("Completions endpoint - no first word repetition", async () => {
   const data = await response.json();
   const choice = data.choices[0];
   assertExists(choice.text);
-  
+
   // The generated text should not start with "One" (first word from prompt)
   const firstWord = choice.text.trim().split(/\s+/)[0]?.toLowerCase();
-  assert(firstWord !== "one", 
-    `Generated text "${choice.text}" should not start with "one" from prompt "${promptText}"`);
+  assert(
+    firstWord !== "one",
+    `Generated text "${choice.text}" should not start with "one" from prompt "${promptText}"`,
+  );
 });
 
 Deno.test("Completions endpoint - max tokens validation", async () => {
@@ -299,11 +301,13 @@ Deno.test("Completions endpoint - max tokens validation", async () => {
   const data = await response.json();
   const choice = data.choices[0];
   assertExists(choice.text);
-  
+
   const tokens = choice.text.trim().split(/\s+/);
-  assert(tokens.length <= maxTokens, 
-    `Generated ${tokens.length} tokens, expected <= ${maxTokens}. Text: "${choice.text}"`);
-  
+  assert(
+    tokens.length <= maxTokens,
+    `Generated ${tokens.length} tokens, expected <= ${maxTokens}. Text: "${choice.text}"`,
+  );
+
   if (tokens.length === maxTokens) {
     assertEquals(choice.finish_reason, "length", "Should indicate length limit was reached");
   }
@@ -311,10 +315,10 @@ Deno.test("Completions endpoint - max tokens validation", async () => {
 
 Deno.test("Completions endpoint - various max token sizes", async () => {
   const testCases = [1, 3, 8, 15];
-  
+
   for (const maxTokens of testCases) {
     const requestBody = {
-      model: "test-model", 
+      model: "test-model",
       prompt: "Generate some text",
       max_tokens: maxTokens,
       n: 1,
@@ -330,9 +334,11 @@ Deno.test("Completions endpoint - various max token sizes", async () => {
     const data = await response.json();
     const choice = data.choices[0];
     const tokens = choice.text.trim().split(/\s+/);
-    
-    assert(tokens.length <= maxTokens, 
-      `maxTokens=${maxTokens}: Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+
+    assert(
+      tokens.length <= maxTokens,
+      `maxTokens=${maxTokens}: Generated ${tokens.length} tokens, expected <= ${maxTokens}`,
+    );
   }
 });
 
@@ -357,20 +363,22 @@ Deno.test("Chat completions endpoint - max tokens strictly respected", async () 
   const data = await response.json();
   const choice = data.choices[0];
   assertExists(choice.message.content);
-  
+
   const tokens = choice.message.content.trim().split(/\s+/);
-  
+
   // Should generate close to max_tokens (allow some tolerance for edge cases)
-  assert(tokens.length <= maxTokens, 
-    `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
-  
+  assert(tokens.length <= maxTokens, `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+
   // With aggressive fallback, we should consistently get at least 95% of max_tokens
-  assert(tokens.length >= maxTokens * 0.95, 
-    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${Math.round(tokens.length/maxTokens*100)}%)`);
-  
+  assert(
+    tokens.length >= maxTokens * 0.95,
+    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${
+      Math.round(tokens.length / maxTokens * 100)
+    }%)`,
+  );
+
   // Should hit the length limit due to aggressive fallback
-  assertEquals(choice.finish_reason, "length", 
-    "Should hit length limit with aggressive fallback");
+  assertEquals(choice.finish_reason, "length", "Should hit length limit with aggressive fallback");
 });
 
 Deno.test("Completions endpoint - 95% max tokens requirement", async () => {
@@ -392,19 +400,21 @@ Deno.test("Completions endpoint - 95% max tokens requirement", async () => {
   const data = await response.json();
   const choice = data.choices[0];
   assertExists(choice.text);
-  
+
   const tokens = choice.text.trim().split(/\s+/);
-  
-  assert(tokens.length <= maxTokens, 
-    `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
-  
+
+  assert(tokens.length <= maxTokens, `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+
   // With aggressive fallback, should generate at least 95% of max_tokens
-  assert(tokens.length >= maxTokens * 0.95, 
-    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${Math.round(tokens.length/maxTokens*100)}%)`);
-  
+  assert(
+    tokens.length >= maxTokens * 0.95,
+    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${
+      Math.round(tokens.length / maxTokens * 100)
+    }%)`,
+  );
+
   // Should hit the length limit due to aggressive fallback
-  assertEquals(choice.finish_reason, "length", 
-    "Should hit length limit with aggressive fallback");
+  assertEquals(choice.finish_reason, "length", "Should hit length limit with aggressive fallback");
 });
 
 Deno.test("Chat completions endpoint - high max tokens test", async () => {
@@ -428,17 +438,19 @@ Deno.test("Chat completions endpoint - high max tokens test", async () => {
   const data = await response.json();
   const choice = data.choices[0];
   assertExists(choice.message.content);
-  
+
   const tokens = choice.message.content.trim().split(/\s+/);
-  
-  assert(tokens.length <= maxTokens, 
-    `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
-  
+
+  assert(tokens.length <= maxTokens, `Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+
   // With aggressive fallback, should generate at least 95% of max_tokens
-  assert(tokens.length >= maxTokens * 0.95, 
-    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${Math.round(tokens.length/maxTokens*100)}%)`);
-  
+  assert(
+    tokens.length >= maxTokens * 0.95,
+    `Should generate at least 95% of max_tokens. Got ${tokens.length}/${maxTokens} (${
+      Math.round(tokens.length / maxTokens * 100)
+    }%)`,
+  );
+
   // Should hit the length limit due to aggressive fallback
-  assertEquals(choice.finish_reason, "length", 
-    "Should hit length limit with aggressive fallback");
+  assertEquals(choice.finish_reason, "length", "Should hit length limit with aggressive fallback");
 });

@@ -61,12 +61,16 @@ function nextToken(
   const weights: number[] = [];
 
   // Check if we only have punctuation as options or very limited good options
-  const nonPunctuationOptions = Array.from(map.keys()).filter(token => !isPunctuationToken(token));
-  
-  // If we have very few options and punctuation dominates, 
+  const nonPunctuationOptions = Array.from(map.keys()).filter((token) =>
+    !isPunctuationToken(token)
+  );
+
+  // If we have very few options and punctuation dominates,
   // this suggests the current token is a poor continuation point
-  if (map.size <= 3 && (nonPunctuationOptions.length === 0 || 
-      nonPunctuationOptions.length === 1 && map.size === 2)) {
+  if (
+    map.size <= 3 && (nonPunctuationOptions.length === 0 ||
+      nonPunctuationOptions.length === 1 && map.size === 2)
+  ) {
     // Return null to trigger fallback to a better starting token
     return null;
   }
@@ -154,26 +158,30 @@ export function generateCorpusMarkovAnswer(
     if (!next) {
       // When we can't continue, find a random token with good continuations
       // This ensures we keep generating until we hit max_tokens
-      const tokensWithGoodContinuations = Array.from(transitions.keys()).filter(token => {
+      const tokensWithGoodContinuations = Array.from(transitions.keys()).filter((token) => {
         const nextOptions = transitions.get(token);
         if (!nextOptions) return false;
-        const nonPunctuation = Array.from(nextOptions.keys()).filter(t => !isPunctuationToken(t));
+        const nonPunctuation = Array.from(nextOptions.keys()).filter((t) => !isPunctuationToken(t));
         return nonPunctuation.length >= 1; // Has at least 1 non-punctuation option
       });
-      
+
       if (tokensWithGoodContinuations.length > 0) {
         // Choose a random token with good continuations
-        current = tokensWithGoodContinuations[Math.floor(Math.random() * tokensWithGoodContinuations.length)];
+        current = tokensWithGoodContinuations[
+          Math.floor(Math.random() * tokensWithGoodContinuations.length)
+        ];
         continue;
       } else {
         // Fallback: choose any random token that has continuations
-        const anyTokensWithContinuations = Array.from(transitions.keys()).filter(token => {
+        const anyTokensWithContinuations = Array.from(transitions.keys()).filter((token) => {
           const nextOptions = transitions.get(token);
           return nextOptions && nextOptions.size > 0;
         });
-        
+
         if (anyTokensWithContinuations.length > 0) {
-          current = anyTokensWithContinuations[Math.floor(Math.random() * anyTokensWithContinuations.length)];
+          current = anyTokensWithContinuations[
+            Math.floor(Math.random() * anyTokensWithContinuations.length)
+          ];
           continue;
         }
       }

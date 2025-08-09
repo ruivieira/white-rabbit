@@ -1,6 +1,7 @@
 import { genParagraph } from "./text_generation.ts";
 import { generateCorpusMarkovAnswer } from "./markov.ts";
 import { getVersionInfo } from "./version.ts";
+import { initLogger } from "./logger.ts";
 import {
   ChatCompletionsRequest,
   CompletionsRequest,
@@ -12,6 +13,9 @@ import {
   TokenizeRequest,
 } from "./api.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+// Initialize logger for this module
+const logger = initLogger("server");
 
 // Get model name from environment variable, with fallback to default
 function getModelName(_requestModel: string): string {
@@ -44,7 +48,50 @@ const serverStats = {
   startTime: Date.now(),
   totalRequests: 0,
   runningRequests: 0,
+  promptTokens: 0,
+  generationTokens: 0,
+  lastLogTime: Date.now(),
 };
+
+// Periodic stats logging (similar to vLLM)
+function logPeriodicStats(): void {
+  const now = Date.now();
+  const deltaTime = (now - serverStats.lastLogTime) / 1000; // Convert to seconds
+
+  if (deltaTime <= 0) return;
+
+  const promptThroughput = serverStats.promptTokens / deltaTime;
+  const generationThroughput = serverStats.generationTokens / deltaTime;
+  const uptime = Math.floor((now - serverStats.startTime) / 1000);
+
+  // Log stats similar to vLLM format
+  logger.info(
+    `Engine 000: Avg prompt throughput: ${promptThroughput.toFixed(1)} tokens/s, ` +
+      `Avg generation throughput: ${generationThroughput.toFixed(1)} tokens/s, ` +
+      `Running: ${serverStats.runningRequests} reqs, ` +
+      `Total: ${serverStats.totalRequests} reqs, ` +
+      `Uptime: ${uptime}s`,
+    "server.ts",
+    65,
+  );
+
+  // Reset counters for next interval
+  serverStats.promptTokens = 0;
+  serverStats.generationTokens = 0;
+  serverStats.lastLogTime = now;
+}
+
+// Start periodic stats logging every 10 seconds (similar to vLLM)
+let statsInterval: number;
+function startPeriodicStatsLogging(): void {
+  statsInterval = setInterval(logPeriodicStats, 10000); // 10 seconds
+}
+
+function stopPeriodicStatsLogging(): void {
+  if (statsInterval) {
+    clearInterval(statsInterval);
+  }
+}
 
 // Mock tokenizer functions
 function mockTokenize(text: string, addSpecialTokens = true): number[] {
@@ -297,6 +344,20 @@ ${LOGO}
    • GET /stats
 💡 Ready to serve mock OpenAI-compatible responses!
 `);
+
+  logger.info("White Rabbit vLLM Emulator starting up", "server.ts", 300);
+  logger.info(`Server running on port ${port}`, "server.ts", 301);
+  logger.info(`Model: ${modelName}`, "server.ts", 302);
+  logger.info("Available routes:", "server.ts", 303);
+  logger.info("Route: /health, Methods: GET", "server.ts", 304);
+  logger.info("Route: /v1/chat/completions, Methods: POST", "server.ts", 305);
+  logger.info("Route: /v1/completions, Methods: POST", "server.ts", 306);
+  logger.info("Route: /v1/embeddings, Methods: POST", "server.ts", 307);
+  logger.info("Route: /v1/models, Methods: GET", "server.ts", 308);
+  logger.info("Route: /tokenize, Methods: POST", "server.ts", 309);
+  logger.info("Route: /detokenize, Methods: POST", "server.ts", 310);
+  logger.info("Route: /version, Methods: GET", "server.ts", 311);
+  logger.info("Route: /stats, Methods: GET", "server.ts", 312);
 }
 
 function generateMockEmbedding(dimensions = 384): number[] {
@@ -323,14 +384,19 @@ export async function handleRequest(req: Request): Promise<Response> {
   serverStats.totalRequests++;
   serverStats.runningRequests++;
 
+  logger.debug(`Incoming ${req.method} request to ${url.pathname}`, "server.ts", 327);
+
   try {
     if (req.method === "GET" && url.pathname === "/health") {
+      logger.debug("Health check request", "server.ts", 331);
       return json({ status: "ok" });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
+      logger.info("Processing chat completion request", "server.ts", 335);
       const body = await parseJson<ChatCompletionsRequest>(req);
       if (!body || !body.model || !Array.isArray(body.messages)) {
+        logger.warning("Invalid chat completion request body", "server.ts", 338);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -339,6 +405,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       const wantLogprobs = Boolean(body.logprobs);
 
       const promptTokens = body.messages.reduce((acc, m) => acc + countWords(m.content ?? ""), 0);
+      serverStats.promptTokens += promptTokens;
 
       const choices: unknown[] = [];
       let generatedTokens = 0;
@@ -362,7 +429,9 @@ export async function handleRequest(req: Request): Promise<Response> {
           }
         }
 
-        generatedTokens += text.trim().length ? text.trim().split(/\s+/).length : 0;
+        const tokensInResponse = text.trim().length ? text.trim().split(/\s+/).length : 0;
+        generatedTokens += tokensInResponse;
+        serverStats.generationTokens += tokensInResponse;
         choices.push({
           index: i,
           message: { role: "assistant", content: text, refusal: null },
@@ -386,12 +455,15 @@ export async function handleRequest(req: Request): Promise<Response> {
         },
         prompt_logprobs: null,
       };
+      logger.info(`Chat completion generated: ${generatedTokens} tokens`, "server.ts", 389);
       return json(resp);
     }
 
     if (req.method === "POST" && url.pathname === "/v1/completions") {
+      logger.info("Processing completion request", "server.ts", 393);
       const body = await parseJson<CompletionsRequest>(req);
       if (!body || !body.model || typeof body.prompt === "undefined") {
+        logger.warning("Invalid completion request body", "server.ts", 396);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -403,12 +475,18 @@ export async function handleRequest(req: Request): Promise<Response> {
         ? (body.prompt[0] ?? "")
         : String(body.prompt ?? "");
 
+      const promptTokens = countWords(promptStr);
+      serverStats.promptTokens += promptTokens;
+
       const choices: unknown[] = [];
 
       for (let i = 0; i < n; i++) {
         let { text, hitMaxLength } = generateCorpusMarkovAnswer(promptStr, maxTokens);
         if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
         if (body.echo) text = promptStr + text;
+
+        const tokensInResponse = text.trim().length ? text.trim().split(/\s+/).length : 0;
+        serverStats.generationTokens += tokensInResponse;
 
         let logprobs: {
           text_offset: number[];
@@ -453,8 +531,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     if (req.method === "POST" && url.pathname === "/v1/embeddings") {
+      logger.info("Processing embedding request", "server.ts", 456);
       const body = await parseJson<EmbeddingRequest>(req);
       if (!body || !body.model || !body.input) {
+        logger.warning("Invalid embedding request body", "server.ts", 459);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -505,6 +585,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /v1/models - List available models
     if (req.method === "GET" && url.pathname === "/v1/models") {
+      logger.debug("Listing available models", "server.ts", 508);
       const response: ModelsResponse = {
         object: "list",
         data: getAvailableModels(),
@@ -514,8 +595,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // POST /tokenize - Tokenize text
     if (req.method === "POST" && url.pathname === "/tokenize") {
+      logger.debug("Processing tokenize request", "server.ts", 517);
       const body = await parseJson<TokenizeRequest>(req);
       if (!body || !body.model || typeof body.text !== "string") {
+        logger.warning("Invalid tokenize request body", "server.ts", 520);
         return json({ error: "Invalid request body. Required fields: model, text" }, 400);
       }
 
@@ -530,8 +613,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // POST /detokenize - Convert tokens back to text
     if (req.method === "POST" && url.pathname === "/detokenize") {
+      logger.debug("Processing detokenize request", "server.ts", 533);
       const body = await parseJson<DetokenizeRequest>(req);
       if (!body || !body.model || !Array.isArray(body.tokens)) {
+        logger.warning("Invalid detokenize request body", "server.ts", 536);
         return json({ error: "Invalid request body. Required fields: model, tokens" }, 400);
       }
 
@@ -544,6 +629,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /version - Return vLLM version info
     if (req.method === "GET" && url.pathname === "/version") {
+      logger.debug("Processing version request", "server.ts", 547);
       const includeDetails = url.searchParams.get("details") === "true";
       const versionInfo = getVersionInfo(includeDetails);
       return json(versionInfo);
@@ -551,6 +637,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /stats - Return server statistics
     if (req.method === "GET" && url.pathname === "/stats") {
+      logger.debug("Processing stats request", "server.ts", 554);
       const _uptime = Date.now() - serverStats.startTime;
       const response: StatsResponse = {
         num_requests: serverStats.totalRequests,
@@ -564,7 +651,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       return json(response);
     }
 
+    logger.warning(`Route not found: ${req.method} ${url.pathname}`, "server.ts", 568);
     return json({ error: "Not found" }, 404);
+  } catch (error) {
+    logger.error(`Request processing error: ${error}`, "server.ts", 571);
+    return json({ error: "Internal server error" }, 500);
   } finally {
     // Decrement running requests counter
     serverStats.runningRequests = Math.max(0, serverStats.runningRequests - 1);
@@ -575,5 +666,26 @@ export async function handleRequest(req: Request): Promise<Response> {
 if (import.meta.main) {
   const port = 8000;
   showStartupBanner(port);
-  serve(handleRequest, { port });
+  logger.info("Starting HTTP server", "server.ts", 579);
+  startPeriodicStatsLogging();
+
+  serve(handleRequest, { port }).then(() => {
+    logger.info("HTTP server started successfully", "server.ts", 580);
+  }).catch((error) => {
+    logger.error(`Failed to start HTTP server: ${error}`, "server.ts", 582);
+    stopPeriodicStatsLogging();
+  });
+
+  // Graceful shutdown
+  Deno.addSignalListener("SIGINT", () => {
+    logger.info("Received SIGINT, shutting down gracefully", "server.ts", 588);
+    stopPeriodicStatsLogging();
+    Deno.exit(0);
+  });
+
+  Deno.addSignalListener("SIGTERM", () => {
+    logger.info("Received SIGTERM, shutting down gracefully", "server.ts", 593);
+    stopPeriodicStatsLogging();
+    Deno.exit(0);
+  });
 }

@@ -2,13 +2,27 @@
 
 [![Tests](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml)
 [![JSR](https://jsr.io/badges/@rui/white-rabbit)](https://jsr.io/@rui/white-rabbit)
-[![JSR Score](https://jsr.io/badges/@rui/white-rabbit/score)](https://jsr.io/@rui/white-rabbit) [![quay.io](https://quay.io/repository/ruimvieira/white-rabbit/status "Docker Repository on Quay")](https://quay.io/repository/ruimvieira/white-rabbit)
+[![JSR Score](https://jsr.io/badges/@rui/white-rabbit/score)](https://jsr.io/@rui/white-rabbit)
+[![quay.io](https://quay.io/repository/ruimvieira/white-rabbit/status "Docker Repository on Quay")](https://quay.io/repository/ruimvieira/white-rabbit)
 
 <div align="center">
   <img src="docs/white-rabbit.jpg" alt="White Rabbit" width="300" />
 </div>
 
 Deno vLLM emulator providing mock OpenAI-compatible API endpoints for testing and development.
+
+## Purpose
+
+White Rabbit is designed to **test integration with vLLM APIs** without requiring a real LLM
+deployment. The responses are typically gibberish since no actual language model is served - this is
+intentional for testing API compatibility, request/response formats, and integration workflows.
+
+Perfect for:
+
+- Testing vLLM API integration code
+- Development environments where you need vLLM-compatible endpoints
+- CI/CD pipelines that need mock LLM services
+- Load testing API clients without GPU resources
 
 ## Installation
 
@@ -53,10 +67,18 @@ WR_MODEL="my-custom-model" deno task start
 
 ### Environment Variables
 
+**Model Configuration:**
+
 - `WR_MODEL` - Override the model name returned in API responses. If not set, defaults to
   `Qwen/Qwen2.5-1.5B-Instruct`.
 
-Example:
+**Logging Configuration:**
+
+- `WR_LOG_LEVEL` - Set logging level: `DEBUG`, `INFO`, `WARNING`, or `ERROR` (default: `DEBUG`)
+- `WR_LOG_PREFIX` - Customise log message prefix (default: `WHITE_RABBIT`)
+- `WR_LOG_COLORS` - Enable/disable coloured log output: `true` or `false` (default: `true`)
+
+**Examples:**
 
 ```bash
 # Set model name to "granite-3.1-8b"
@@ -65,6 +87,12 @@ deno task start
 
 # Or inline
 WR_MODEL="granite-3.1-8b" deno task start
+
+# Configure logging
+WR_LOG_LEVEL=INFO WR_LOG_PREFIX="MY_SERVER" deno task start
+
+# Disable coloured logs (useful for log files)
+WR_LOG_COLORS=false deno task start
 ```
 
 ## Supported Endpoints
@@ -221,6 +249,8 @@ curl --request GET \
 
 ## Features
 
+### Core Functionality
+
 - **Mock Data Generation**: Generates realistic-looking mock responses with random text and
   embeddings
 - **Markov completions**: Uses a small QA dataset and a weighted Markov chain to produce more
@@ -234,6 +264,19 @@ curl --request GET \
 - **Model Management**: Lists available models with metadata
 - **Tokenization Support**: Mock tokenization and detokenization with consistent token IDs
 - **Server Monitoring**: Provides version information and real-time server statistics
+
+### Logging and Monitoring
+
+- **vLLM-Compatible Logging**: Professional logging system that matches vLLM's output format
+- **Periodic Statistics**: Automatic throughput reporting every 10 seconds (like vLLM)
+  - Prompt tokens per second
+  - Generation tokens per second
+  - Running and total request counts
+  - Server uptime tracking
+- **Request Tracing**: Debug-level logging of all incoming requests and processing steps
+- **Configurable Log Levels**: DEBUG, INFO, WARNING, ERROR with environment variable control
+- **Coloured Output**: Colour-coded log messages for easy reading (configurable)
+- **Graceful Shutdown**: Proper signal handling and resource cleanup
 
 Any string is accepted for the `model` argument across all endpoints. However, the actual model name
 returned in responses is determined by the `WR_MODEL` environment variable (or the default
