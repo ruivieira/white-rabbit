@@ -8,7 +8,13 @@ ci:
     updates:
     - [{repo}]({homepage}) {old_rev} → {new_rev}
   autoupdate_schedule: weekly
-  skip: [deno-fmt, deno-lint, deno-check, deno-test, changelog-generation] # Skip Deno operations - not available in CI
+  skip: [
+    deno-fmt,
+    deno-lint,
+    deno-check,
+    deno-test,
+    changelog-generation,
+  ] # Skip Deno operations - not available in CI
   submodules: false
 
 # Specific settings for pre-commit.ci
