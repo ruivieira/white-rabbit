@@ -28,6 +28,34 @@ function countWords(text: string): number {
   return text.trim().length ? text.trim().split(/\s+/).length : 0;
 }
 
+// Embedded logo for compatibility with compiled binaries
+const LOGO = `             ,\\
+             \\\\\\,_
+              \\\` ,\\
+         __,.-" =__)
+       ."        )
+    ,_/   ,    \\/\\_
+    \\_|    )_-\\ \\_-\`
+jgs    \`-----\` \`--\``;
+
+function showStartupBanner(port: number): void {
+  const modelName = Deno.env.get("WR_MODEL") || "Qwen/Qwen2.5-1.5B-Instruct";
+  
+  console.log(`
+${LOGO}
+
+🐰 White Rabbit vLLM Emulator
+🚀 Server running on port ${port}
+🤖 Model: ${modelName}
+🔗 Health check: http://localhost:${port}/health
+📡 Endpoints:
+   • POST /v1/chat/completions
+   • POST /v1/completions  
+   • POST /v1/embeddings
+💡 Ready to serve mock OpenAI-compatible responses!
+`);
+}
+
 function generateMockEmbedding(dimensions = 384): number[] {
   // Generate a normalised random vector
   const embedding = Array.from({ length: dimensions }, () => Math.random() - 0.5);
@@ -227,5 +255,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
 // Only start server if this is the main module
 if (import.meta.main) {
-  serve(handleRequest, { port: 8000 });
+  const port = 8000;
+  showStartupBanner(port);
+  serve(handleRequest, { port });
 }

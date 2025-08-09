@@ -1,9 +1,3 @@
-/**
- * White Rabbit - Deno vLLM emulator providing mock OpenAI-compatible API endpoints
- *
- * @module
- */
-
 // Export all API types and interfaces
 export type {
   BaseCompletionsRequest,
