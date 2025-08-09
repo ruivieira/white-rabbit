@@ -85,6 +85,20 @@ White Rabbit provides mock implementations of the following OpenAI-compatible en
 
 - `POST /v1/embeddings` - Generate text embeddings
 
+### Models
+
+- `GET /v1/models` - List available models
+
+### Tokenization
+
+- `POST /tokenize` - Tokenise text into token IDs
+- `POST /detokenize` - Convert token IDs back to text
+
+### Server Information
+
+- `GET /version` - Return vLLM version information
+- `GET /stats` - Return server statistics and metrics
+
 ## Usage Examples
 
 ### Chat Completions
@@ -152,16 +166,72 @@ curl --request POST \
 }'
 ```
 
+### Models
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/v1/models
+```
+
+### Tokenization
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/tokenize \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "test-model",
+  "text": "Hello, world!",
+  "add_special_tokens": true
+}'
+```
+
+### Detokenization
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/detokenize \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "test-model",
+  "tokens": [1, 15496, 11, 1917, 0, 2]
+}'
+```
+
+### Version Information
+
+```bash
+# Basic version info
+curl --request GET \
+  --url http://localhost:8000/version
+
+# Detailed version info with build details
+curl --request GET \
+  --url http://localhost:8000/version?details=true
+```
+
+### Server Statistics
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/stats
+```
+
 ## Features
 
 - **Mock Data Generation**: Generates realistic-looking mock responses with random text and
   embeddings
+- **Markov completions**: Uses a small QA dataset and a weighted Markov chain to produce
+  more topic-relevant answers for `/v1/completions` and `/v1/chat/completions`.
 - **OpenAI API Compatibility**: Follows OpenAI API specifications for request/response formats
 - **Multiple Input Support**: Supports single strings, arrays of strings, and token ID arrays
 - **Configurable Parameters**: Supports parameters like `max_tokens`, `n`, `logprobs`, `dimensions`,
   etc.
 - **Normalised Embeddings**: Generated embeddings are unit vectors (normalised to length 1)
 - **Token Usage Tracking**: Returns realistic token usage statistics
+- **Model Management**: Lists available models with metadata
+- **Tokenization Support**: Mock tokenization and detokenization with consistent token IDs
+- **Server Monitoring**: Provides version information and real-time server statistics
 
 Any string is accepted for the `model` argument across all endpoints. However, the actual model name
 returned in responses is determined by the `WR_MODEL` environment variable (or the default

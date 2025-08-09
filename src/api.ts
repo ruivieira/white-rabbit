@@ -44,3 +44,66 @@ export interface EmbeddingResponse {
     total_tokens: number;
   };
 }
+
+// New endpoint types
+export interface TokenizeRequest {
+  model: string;
+  text: string;
+  add_special_tokens?: boolean;
+}
+
+export interface TokenizeResponse {
+  tokens: number[];
+  count: number;
+  max_model_len: number;
+}
+
+export interface DetokenizeRequest {
+  model: string;
+  tokens: number[];
+}
+
+export interface DetokenizeResponse {
+  text: string;
+}
+
+export interface ModelInfo {
+  id: string;
+  object: "model";
+  created: number;
+  owned_by: string;
+  permission: unknown[];
+  root: string;
+  parent: null;
+  max_model_len?: number;
+}
+
+export interface ModelsResponse {
+  object: "list";
+  data: ModelInfo[];
+}
+
+export interface VersionResponse {
+  version: string;
+  white_rabbit_version: string;
+  build_info?: {
+    name: string;
+    description: string;
+    version: string;
+    vllm_version: string;
+    deno_version: string;
+    typescript_version: string;
+    v8_version: string;
+    built_at: string;
+  };
+}
+
+export interface StatsResponse {
+  num_requests: number;
+  num_requests_running: number;
+  num_requests_swapped: number;
+  num_requests_waiting: number;
+  gpu_cache_usage: number;
+  cpu_cache_usage: number;
+  num_preemptions: number;
+}

@@ -1,5 +1,16 @@
 import { genParagraph } from "./text_generation.ts";
-import { ChatCompletionsRequest, CompletionsRequest, EmbeddingRequest } from "./api.ts";
+import { generateCorpusMarkovAnswer } from "./markov.ts";
+import { getVersionInfo } from "./version.ts";
+import { 
+  ChatCompletionsRequest, 
+  CompletionsRequest, 
+  EmbeddingRequest,
+  TokenizeRequest,
+  DetokenizeRequest,
+  ModelInfo,
+  ModelsResponse,
+  StatsResponse
+} from "./api.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 // Get model name from environment variable, with fallback to default
@@ -28,6 +39,64 @@ function countWords(text: string): number {
   return text.trim().length ? text.trim().split(/\s+/).length : 0;
 }
 
+// Server statistics tracking
+const serverStats = {
+  startTime: Date.now(),
+  totalRequests: 0,
+  runningRequests: 0,
+};
+
+// Mock tokenizer functions
+function mockTokenize(text: string, addSpecialTokens = true): number[] {
+  // Simple mock tokenization: each word/punctuation becomes a token ID
+  const words = text.split(/(\s+|[.,!?;:])/g).filter(w => w.trim());
+  const tokens = words.map((word, _index) => {
+    // Generate consistent token IDs based on word hash
+    let hash = 0;
+    for (let i = 0; i < word.length; i++) {
+      const char = word.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash) % 50000 + 1000; // Token IDs between 1000-51000
+  });
+  
+  if (addSpecialTokens) {
+    return [1, ...tokens, 2]; // Add BOS (1) and EOS (2) tokens
+  }
+  return tokens;
+}
+
+function mockDetokenize(tokens: number[]): string {
+  // Simple mock detokenization: convert token IDs back to placeholder text
+  return tokens.map(tokenId => {
+    if (tokenId === 1) return "<bos>";
+    if (tokenId === 2) return "<eos>";
+    if (tokenId < 1000) return `<special_${tokenId}>`;
+    
+    // Generate consistent words from token IDs
+    const words = ["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "about", "into", "through", "during", "before", "after", "above", "below", "between", "among", "within", "without", "under", "over", "inside", "outside", "near", "far", "here", "there", "where", "when", "why", "how", "what", "who", "which", "this", "that", "these", "those", "some", "many", "few", "all", "none", "each", "every", "any", "other", "another", "same", "different", "new", "old", "young", "big", "small", "large", "little", "high", "low", "long", "short", "wide", "narrow", "thick", "thin", "heavy", "light", "dark", "bright", "clean", "dirty", "hot", "cold", "warm", "cool", "dry", "wet", "hard", "soft", "smooth", "rough", "strong", "weak", "fast", "slow", "quick", "easy", "difficult", "simple", "complex", "good", "bad", "right", "wrong", "true", "false", "real", "fake", "important", "necessary", "possible", "impossible", "sure", "certain", "clear", "obvious", "hidden", "secret", "open", "closed", "free", "busy", "ready", "finished", "complete", "empty", "full", "rich", "poor", "happy", "sad", "angry", "calm", "excited", "bored", "tired", "fresh", "alive", "dead", "healthy", "sick", "safe", "dangerous", "careful", "careless", "patient", "impatient", "kind", "mean", "friendly", "unfriendly", "polite", "rude", "honest", "dishonest", "brave", "afraid", "confident", "nervous", "proud", "ashamed", "surprised", "expected", "interested", "bored", "worried", "relaxed", "stressed", "comfortable", "uncomfortable"];
+    const wordIndex = (tokenId - 1000) % words.length;
+    return words[wordIndex];
+  }).join(" ");
+}
+
+function getAvailableModels(): ModelInfo[] {
+  const modelName = getModelName("");
+  const created = Math.floor(serverStats.startTime / 1000);
+  
+  return [{
+    id: modelName,
+    object: "model",
+    created,
+    owned_by: "white-rabbit",
+    permission: [],
+    root: modelName,
+    parent: null,
+    max_model_len: 32768,
+  }];
+}
+
 // Embedded logo for compatibility with compiled binaries
 const LOGO = `             ,\\
              \\\\\\,_
@@ -52,6 +121,11 @@ ${LOGO}
    • POST /v1/chat/completions
    • POST /v1/completions  
    • POST /v1/embeddings
+   • GET /v1/models
+   • POST /tokenize
+   • POST /detokenize
+   • GET /version
+   • GET /stats
 💡 Ready to serve mock OpenAI-compatible responses!
 `);
 }
@@ -75,9 +149,15 @@ async function parseJson<T>(req: Request): Promise<T | null> {
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  if (req.method === "GET" && url.pathname === "/health") {
-    return json({ status: "ok" });
-  }
+  
+  // Track request statistics
+  serverStats.totalRequests++;
+  serverStats.runningRequests++;
+  
+  try {
+    if (req.method === "GET" && url.pathname === "/health") {
+      return json({ status: "ok" });
+    }
 
   if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
     const body = await parseJson<ChatCompletionsRequest>(req);
@@ -95,7 +175,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     let generatedTokens = 0;
 
     for (let i = 0; i < n; i++) {
-      const { text, hitMaxLength } = genParagraph(maxTokens);
+      const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
+      const seed = lastUser?.content ?? "";
+      let { text, hitMaxLength } = generateCorpusMarkovAnswer(seed, maxTokens);
+      if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
 
       let logprobs: {
         content: Array<
@@ -154,7 +237,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     const choices: unknown[] = [];
 
     for (let i = 0; i < n; i++) {
-      let { text, hitMaxLength } = genParagraph(maxTokens);
+      let { text, hitMaxLength } = generateCorpusMarkovAnswer(promptStr, maxTokens);
+      if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
       if (body.echo) text = promptStr + text;
 
       let logprobs: {
@@ -250,7 +334,72 @@ export async function handleRequest(req: Request): Promise<Response> {
     return json(resp);
   }
 
+  // GET /v1/models - List available models
+  if (req.method === "GET" && url.pathname === "/v1/models") {
+    const response: ModelsResponse = {
+      object: "list",
+      data: getAvailableModels(),
+    };
+    return json(response);
+  }
+
+  // POST /tokenize - Tokenize text
+  if (req.method === "POST" && url.pathname === "/tokenize") {
+    const body = await parseJson<TokenizeRequest>(req);
+    if (!body || !body.model || typeof body.text !== "string") {
+      return json({ error: "Invalid request body. Required fields: model, text" }, 400);
+    }
+
+    const tokens = mockTokenize(body.text, body.add_special_tokens ?? true);
+    const response = {
+      tokens,
+      count: tokens.length,
+      max_model_len: 32768,
+    };
+    return json(response);
+  }
+
+  // POST /detokenize - Convert tokens back to text
+  if (req.method === "POST" && url.pathname === "/detokenize") {
+    const body = await parseJson<DetokenizeRequest>(req);
+    if (!body || !body.model || !Array.isArray(body.tokens)) {
+      return json({ error: "Invalid request body. Required fields: model, tokens" }, 400);
+    }
+
+    const text = mockDetokenize(body.tokens);
+    const response = {
+      text,
+    };
+    return json(response);
+  }
+
+  // GET /version - Return vLLM version info
+  if (req.method === "GET" && url.pathname === "/version") {
+    const includeDetails = url.searchParams.get("details") === "true";
+    const versionInfo = getVersionInfo(includeDetails);
+    return json(versionInfo);
+  }
+
+  // GET /stats - Return server statistics
+  if (req.method === "GET" && url.pathname === "/stats") {
+    const _uptime = Date.now() - serverStats.startTime;
+    const response: StatsResponse = {
+      num_requests: serverStats.totalRequests,
+      num_requests_running: serverStats.runningRequests,
+      num_requests_swapped: 0,
+      num_requests_waiting: Math.max(0, Math.floor(Math.random() * 3)), // Mock waiting requests
+      gpu_cache_usage: Math.random() * 0.8, // Mock GPU cache usage (0-80%)
+      cpu_cache_usage: Math.random() * 0.6, // Mock CPU cache usage (0-60%)
+      num_preemptions: Math.floor(Math.random() * 10), // Mock preemptions
+    };
+    return json(response);
+  }
+
   return json({ error: "Not found" }, 404);
+  } finally {
+    // Decrement running requests counter
+    serverStats.runningRequests = Math.max(0, serverStats.runningRequests - 1);
+  }
 }
 
 // Only start server if this is the main module
