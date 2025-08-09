@@ -1,0 +1,30 @@
+name: release-jsr
+on:
+  push:
+    tags:
+      - "v*.*.*"
+permissions:
+  contents: read
+  id-token: write # The OIDC ID token is used for authentication with JSR.
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.4.3
+      - name: Set package version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq ".version = \"${VERSION}\"" deno.json > deno.tmp && mv deno.tmp deno.json
+      - name: Check formatting
+        run: deno fmt --check
+      - name: Check linting
+        run: deno lint
+      - name: Type check
+        run: deno check src/**/*.ts tests/**/*.ts
+      - name: Run tests
+        run: deno test -A tests/
+      - name: Publish to JSR
+        run: npx jsr publish --allow-dirty

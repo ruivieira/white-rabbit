@@ -1,4 +1,11 @@
 {
+  "name": "@rui/white-rabbit",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./mod.ts",
+    "./api": "./src/api.ts",
+    "./text-generation": "./src/text_generation.ts"
+  },
   "tasks": {
     "dev": "deno run -A --watch src/server.ts",
     "start": "deno run -A src/server.ts",
@@ -21,5 +28,23 @@
     "rules": {
       "tags": ["recommended"]
     }
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "mod.ts",
+      "src/**/*.ts",
+      "src/**/*.json",
+      "tests/**/*.ts"
+    ],
+    "exclude": [
+      ".github/**",
+      ".git/**",
+      "docs/**",
+      "Dockerfile",
+      "build-docker.sh",
+      "deno.lock"
+    ]
   }
 }

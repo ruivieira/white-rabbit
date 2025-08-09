@@ -1,4 +1,5 @@
 # white-rabbit
+
 [![Tests](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ruivieira/white-rabbit/actions/workflows/ci.yml)
 
 <div align="center">
@@ -6,6 +7,32 @@
 </div>
 
 Deno vLLM emulator providing mock OpenAI-compatible API endpoints for testing and development.
+
+## Installation
+
+### From JSR
+
+```typescript
+import { genParagraph } from "jsr:@rui/white-rabbit";
+import type { ChatCompletionsRequest, EmbeddingRequest } from "jsr:@rui/white-rabbit/api";
+
+// Generate mock text
+const mockText = genParagraph(5);
+```
+
+### Using specific modules
+
+```typescript
+// Import API types
+import type { 
+  ChatCompletionsRequest,
+  CompletionsRequest,
+  EmbeddingRequest 
+} from "jsr:@rui/white-rabbit/api";
+
+// Import text generation utilities
+import { genParagraph } from "jsr:@rui/white-rabbit/text-generation";
+```
 
 ## Run locally
 
@@ -24,9 +51,11 @@ WR_MODEL="my-custom-model" deno task start
 
 ### Environment Variables
 
-- `WR_MODEL` - Override the model name returned in API responses. If not set, defaults to `Qwen/Qwen2.5-1.5B-Instruct`.
+- `WR_MODEL` - Override the model name returned in API responses. If not set, defaults to
+  `Qwen/Qwen2.5-1.5B-Instruct`.
 
 Example:
+
 ```bash
 # Set model name to "granite-3.1-8b"
 export WR_MODEL="granite-3.1-8b"
@@ -134,7 +163,9 @@ curl --request POST \
 - **Normalised Embeddings**: Generated embeddings are unit vectors (normalised to length 1)
 - **Token Usage Tracking**: Returns realistic token usage statistics
 
-Any string is accepted for the `model` argument across all endpoints. However, the actual model name returned in responses is determined by the `WR_MODEL` environment variable (or the default `Qwen/Qwen2.5-1.5B-Instruct` if not set), regardless of what the client requests.
+Any string is accepted for the `model` argument across all endpoints. However, the actual model name
+returned in responses is determined by the `WR_MODEL` environment variable (or the default
+`Qwen/Qwen2.5-1.5B-Instruct` if not set), regardless of what the client requests.
 
 ## Docker
 

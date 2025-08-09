@@ -1,35 +1,31 @@
-name: CI
-
+name: ci
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
-
+permissions: read-all
 jobs:
-  test:
+  deno:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Deno
-        uses: denoland/setup-deno@v1
+      - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.4.3
-
-      - name: Verify formatting
+      - name: Remove lockfile if exists
+        run: rm -f deno.lock
+      - name: Check formatting
         run: deno fmt --check
-
-      - name: Run linter
+      - name: Check linting
         run: deno lint
-
-      - name: Type check
+      - name: Check types
         run: deno check src/**/*.ts tests/**/*.ts
-
       - name: Run tests
         run: deno test -A tests/
-
+      - name: Run tests with coverage
+        run: deno test -A --coverage=coverage tests/
+      - name: Generate coverage report
+        run: deno coverage coverage --lcov --output=coverage.lcov
       - name: Test server startup
         run: |
           # Start server in background
