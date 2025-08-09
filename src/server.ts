@@ -40,7 +40,7 @@ jgs    \`-----\` \`--\``;
 
 function showStartupBanner(port: number): void {
   const modelName = Deno.env.get("WR_MODEL") || "Qwen/Qwen2.5-1.5B-Instruct";
-  
+
   console.log(`
 ${LOGO}
 
