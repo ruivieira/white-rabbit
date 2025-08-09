@@ -335,7 +335,7 @@ ${LOGO}
 🔗 Health check: http://localhost:${port}/health
 📡 Endpoints:
    • POST /v1/chat/completions
-   • POST /v1/completions  
+   • POST /v1/completions
    • POST /v1/embeddings
    • GET /v1/models
    • POST /tokenize

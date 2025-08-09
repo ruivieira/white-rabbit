@@ -1,0 +1,67 @@
+# Configuration for https://pre-commit.ci
+ci:
+  # Run pre-commit.ci on all branches
+  autoupdate_branch: ""
+  autoupdate_commit_msg: |
+    [pre-commit.ci] pre-commit autoupdate
+
+    updates:
+    - [{repo}]({homepage}) {old_rev} → {new_rev}
+  autoupdate_schedule: weekly
+  skip: [deno-test, changelog-generation] # Skip heavy operations in CI
+  submodules: false
+
+# Specific settings for pre-commit.ci
+repos:
+  - repo: local
+    hooks:
+      - id: deno-fmt
+        name: Deno Format
+        description: Format TypeScript/JavaScript code with Deno
+        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno fmt'
+        language: system
+        files: \.(ts|js|tsx|jsx|json|jsonc|md)$
+        pass_filenames: false
+      - id: deno-lint
+        name: Deno Lint
+        description: Lint TypeScript/JavaScript code with Deno
+        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno lint'
+        language: system
+        files: \.(ts|js|tsx|jsx)$
+        pass_filenames: false
+      - id: deno-check
+        name: Deno Type Check
+        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno check src/**/*.ts tests/**/*.ts'
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+      - id: deno-test
+        name: Deno Test
+        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno test -A tests/'
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+      - id: changelog-generation
+        name: Generate Changelog
+        entry: bash -c 'curl -fsSL https://deno.land/x/install/install.sh | sh && export PATH="$HOME/.deno/bin:$PATH" && deno run -A tools/changelog.ts'
+        language: system
+        files: ^(src/|tests/|tools/|deno\.json|CHANGELOG\.md)
+        pass_filenames: false
+        stages: [pre-push]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md)$
+      - id: end-of-file-fixer
+        exclude: \.(md)$
+      - id: check-yaml
+      - id: check-json
+        exclude: src/bigrams\.json$
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]

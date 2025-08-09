@@ -137,6 +137,8 @@ export function generateCorpusMarkovAnswer(
   const limit = typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 40;
 
   const pTokens = tokenize(prompt);
+  const firstPromptWord = pTokens[0]?.toLowerCase(); // Get first word for repetition check
+
   let current: string | null = null;
   for (let i = pTokens.length - 1; i >= 0; i--) {
     if (transitions.has(pTokens[i])) {
@@ -186,6 +188,23 @@ export function generateCorpusMarkovAnswer(
         }
       }
       break;
+    }
+
+    // Check if this is the first token and it matches the first prompt word
+    if (outTokens.length === 0 && firstPromptWord && next.toLowerCase() === firstPromptWord) {
+      // Skip this token and try to find a different starting point
+      // Find a different token to continue from
+      const alternativeTokens = Array.from(transitions.keys()).filter((token) => {
+        const tokenTransitions = transitions.get(token);
+        return token.toLowerCase() !== firstPromptWord && tokenTransitions &&
+          tokenTransitions.size > 0;
+      });
+
+      if (alternativeTokens.length > 0) {
+        current = alternativeTokens[Math.floor(Math.random() * alternativeTokens.length)];
+        continue; // Try again with different starting token
+      }
+      // If no alternatives, proceed anyway (fallback)
     }
 
     outTokens.push(next);

@@ -2,7 +2,7 @@
 
 /**
  * Changelog Generator for White Rabbit
- * 
+ *
  * Generates a changelog based on git commits and saves it to CHANGELOG.md
  * Parses conventional commit messages and organises them by version tags
  */
@@ -30,11 +30,11 @@ class ChangelogGenerator {
 
   async generateChangelog(): Promise<void> {
     console.log("🐰 Generating changelog from git commits...");
-    
+
     await this.fetchCommits();
     await this.organiseByVersions();
     await this.writeChangelog();
-    
+
     console.log("✅ Changelog generated successfully at CHANGELOG.md");
   }
 
@@ -43,7 +43,7 @@ class ChangelogGenerator {
       args: [
         "log",
         "--pretty=format:%H|%ai|%an|%s",
-        "--reverse"
+        "--reverse",
       ],
       stdout: "piped",
       stderr: "piped",
@@ -61,29 +61,29 @@ class ChangelogGenerator {
 
     for (const line of lines) {
       if (!line.trim()) continue;
-      
+
       const [hash, date, author, message] = line.split("|");
       const commit = this.parseCommitMessage({
         hash: hash.substring(0, 7), // Short hash
         date,
         author,
         message,
-        description: message
+        description: message,
       });
-      
+
       this.commits.push(commit);
     }
 
     console.log(`📝 Parsed ${this.commits.length} commits`);
   }
 
-  private parseCommitMessage(commit: Omit<CommitInfo, 'type' | 'scope' | 'breaking'>): CommitInfo {
+  private parseCommitMessage(commit: Omit<CommitInfo, "type" | "scope" | "breaking">): CommitInfo {
     const message = commit.message;
-    
+
     // Parse conventional commit format: type(scope): description
     const conventionalRegex = /^(\w+)(?:\(([^)]+)\))?\s*:\s*(.+)$/;
     const match = message.match(conventionalRegex);
-    
+
     if (match) {
       const [, type, scope, description] = match;
       return {
@@ -91,21 +91,26 @@ class ChangelogGenerator {
         type,
         scope,
         description,
-        breaking: message.includes("BREAKING CHANGE") || message.includes("!")
+        breaking: message.includes("BREAKING CHANGE") || message.includes("!"),
       };
     }
-    
+
     // Fallback for non-conventional commits
     return {
       ...commit,
       type: "misc",
-      description: message
+      description: message,
     };
   }
 
   private async getVersionTags(): Promise<Map<string, string>> {
     const command = new Deno.Command("git", {
-      args: ["tag", "-l", "--sort=-version:refname", "--format=%(refname:short)|%(creatordate:short)"],
+      args: [
+        "tag",
+        "-l",
+        "--sort=-version:refname",
+        "--format=%(refname:short)|%(creatordate:short)",
+      ],
       stdout: "piped",
       stderr: "piped",
     });
@@ -116,7 +121,7 @@ class ChangelogGenerator {
     if (code === 0) {
       const output = new TextDecoder().decode(stdout);
       const lines = output.trim().split("\n");
-      
+
       for (const line of lines) {
         if (!line.trim()) continue;
         const [tag, date] = line.split("|");
@@ -132,21 +137,26 @@ class ChangelogGenerator {
   private async organiseByVersions(): Promise<void> {
     // Simple approach: get all commits and group them by tags
     console.log("🏷️  Organising commits by version tags...");
-    
+
     // Get all tags with their dates
     const tagCommand = new Deno.Command("git", {
-      args: ["tag", "-l", "--sort=-version:refname", "--format=%(refname:short)|%(creatordate:short)"],
+      args: [
+        "tag",
+        "-l",
+        "--sort=-version:refname",
+        "--format=%(refname:short)|%(creatordate:short)",
+      ],
       stdout: "piped",
       stderr: "piped",
     });
 
     const { code: tagCode, stdout: tagStdout } = await tagCommand.output();
     const tags: Array<{ name: string; date: string }> = [];
-    
+
     if (tagCode === 0) {
       const tagOutput = new TextDecoder().decode(tagStdout);
       const tagLines = tagOutput.trim().split("\n");
-      
+
       for (const line of tagLines) {
         if (line.trim()) {
           const [name, date] = line.split("|");
@@ -157,14 +167,14 @@ class ChangelogGenerator {
       }
     }
 
-    console.log(`Found ${tags.length} tags: ${tags.map(t => t.name).join(", ")}`);
+    console.log(`Found ${tags.length} tags: ${tags.map((t) => t.name).join(", ")}`);
 
     if (tags.length === 0) {
       // No tags, all commits are unreleased
       this.versions.push({
         version: "Unreleased",
-        date: new Date().toISOString().split('T')[0],
-        commits: [...this.commits].reverse()
+        date: new Date().toISOString().split("T")[0],
+        commits: [...this.commits].reverse(),
       });
       console.log(`No tags found, treating all ${this.commits.length} commits as unreleased`);
       return;
@@ -187,16 +197,16 @@ class ChangelogGenerator {
       const unreleasedHashes = new TextDecoder().decode(unreleasedStdout)
         .trim()
         .split("\n")
-        .map(h => h.substring(0, 7))
-        .filter(h => h);
+        .map((h) => h.substring(0, 7))
+        .filter((h) => h);
 
       if (unreleasedHashes.length > 0) {
-        const unreleasedCommits = allCommits.filter(c => unreleasedHashes.includes(c.hash));
+        const unreleasedCommits = allCommits.filter((c) => unreleasedHashes.includes(c.hash));
         if (unreleasedCommits.length > 0) {
           this.versions.push({
             version: "Unreleased",
-            date: new Date().toISOString().split('T')[0],
-            commits: unreleasedCommits
+            date: new Date().toISOString().split("T")[0],
+            commits: unreleasedCommits,
           });
           processedCommits += unreleasedCommits.length;
         }
@@ -207,7 +217,7 @@ class ChangelogGenerator {
     for (let i = 0; i < tags.length; i++) {
       const currentTag = tags[i];
       const previousTag = tags[i + 1];
-      
+
       let rangeCommand: Deno.Command;
       if (previousTag) {
         rangeCommand = new Deno.Command("git", {
@@ -228,34 +238,38 @@ class ChangelogGenerator {
         const tagHashes = new TextDecoder().decode(rangeStdout)
           .trim()
           .split("\n")
-          .map(h => h.substring(0, 7))
-          .filter(h => h);
+          .map((h) => h.substring(0, 7))
+          .filter((h) => h);
 
-        const tagCommits = allCommits.filter(c => tagHashes.includes(c.hash));
+        const tagCommits = allCommits.filter((c) => tagHashes.includes(c.hash));
         if (tagCommits.length > 0) {
           this.versions.push({
             version: currentTag.name,
             date: currentTag.date,
-            commits: tagCommits
+            commits: tagCommits,
           });
           processedCommits += tagCommits.length;
         }
       }
     }
 
-    console.log(`🏷️  Organised ${processedCommits} commits into ${this.versions.length} version sections`);
+    console.log(
+      `🏷️  Organised ${processedCommits} commits into ${this.versions.length} version sections`,
+    );
   }
 
   private async writeChangelog(): Promise<void> {
     const lines: string[] = [];
-    
+
     // Header
     lines.push("# Changelog");
     lines.push("");
     lines.push("All notable changes to this project will be documented in this file.");
     lines.push("");
     lines.push("The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),");
-    lines.push("and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).");
+    lines.push(
+      "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).",
+    );
     lines.push("");
 
     // Process each version
@@ -270,7 +284,7 @@ class ChangelogGenerator {
 
       // Group commits by type
       const commitsByType = this.groupCommitsByType(version.commits);
-      
+
       // Order of sections
       const sectionOrder = [
         { key: "feat", title: "### Added" },
@@ -281,7 +295,7 @@ class ChangelogGenerator {
         { key: "perf", title: "### Performance" },
         { key: "test", title: "### Tests" },
         { key: "chore", title: "### Maintenance" },
-        { key: "misc", title: "### Other" }
+        { key: "misc", title: "### Other" },
       ];
 
       for (const section of sectionOrder) {
@@ -289,7 +303,7 @@ class ChangelogGenerator {
         if (commits && commits.length > 0) {
           lines.push(section.title);
           lines.push("");
-          
+
           for (const commit of commits) {
             const scope = commit.scope ? `**${commit.scope}**: ` : "";
             const breaking = commit.breaking ? " ⚠️ BREAKING" : "";
@@ -307,7 +321,7 @@ class ChangelogGenerator {
 
   private groupCommitsByType(commits: CommitInfo[]): Map<string, CommitInfo[]> {
     const grouped = new Map<string, CommitInfo[]>();
-    
+
     for (const commit of commits) {
       const type = commit.type || "misc";
       if (!grouped.has(type)) {
@@ -315,7 +329,7 @@ class ChangelogGenerator {
       }
       grouped.get(type)!.push(commit);
     }
-    
+
     return grouped;
   }
 }

@@ -1,0 +1,65 @@
+# Pre-commit configuration for White Rabbit
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+default_language_version:
+  python: python3
+
+repos:
+  # Custom hooks for Deno-specific tasks
+  - repo: local
+    hooks:
+      - id: deno-fmt
+        name: Deno Format
+        description: Format TypeScript/JavaScript code with Deno
+        entry: deno fmt
+        language: system
+        files: \.(ts|js|tsx|jsx|json|jsonc|md)$
+        pass_filenames: false
+      - id: deno-lint
+        name: Deno Lint
+        description: Lint TypeScript/JavaScript code with Deno
+        entry: deno lint
+        language: system
+        files: \.(ts|js|tsx|jsx)$
+        pass_filenames: false
+      - id: deno-check
+        name: Deno Type Check
+        description: Type check TypeScript code with Deno
+        entry: deno check src/**/*.ts tests/**/*.ts
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+      - id: deno-test
+        name: Deno Test
+        description: Run all Deno tests
+        entry: deno test -A tests/
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+      - id: changelog-generation
+        name: Generate Changelog
+        description: Regenerate changelog from git commits
+        entry: deno run -A tools/changelog.ts
+        language: system
+        files: ^(src/|tests/|tools/|deno\.json|CHANGELOG\.md)
+        pass_filenames: false
+        stages: [pre-push]
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md)$
+      - id: end-of-file-fixer
+        exclude: \.(md)$
+      - id: check-yaml
+      - id: check-json
+        exclude: src/bigrams\.json$ # This is a large generated file
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
