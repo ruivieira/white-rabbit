@@ -253,3 +253,85 @@ Deno.test("Error handling - invalid JSON", async () => {
   const data = await response.json();
   assertExists(data.error);
 });
+
+Deno.test("Completions endpoint - no first word repetition", async () => {
+  const promptText = "One upon a time";
+  const requestBody = {
+    model: "test-model",
+    prompt: promptText,
+    max_tokens: 10,
+    n: 1,
+  };
+
+  const response = await makeTestRequest("/v1/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+
+  const data = await response.json();
+  const choice = data.choices[0];
+  assertExists(choice.text);
+  
+  // The generated text should not start with "One" (first word from prompt)
+  const firstWord = choice.text.trim().split(/\s+/)[0]?.toLowerCase();
+  assert(firstWord !== "one", 
+    `Generated text "${choice.text}" should not start with "one" from prompt "${promptText}"`);
+});
+
+Deno.test("Completions endpoint - max tokens validation", async () => {
+  const maxTokens = 5;
+  const requestBody = {
+    model: "test-model",
+    prompt: "The quick brown fox jumps over the lazy dog",
+    max_tokens: maxTokens,
+    n: 1,
+  };
+
+  const response = await makeTestRequest("/v1/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+
+  const data = await response.json();
+  const choice = data.choices[0];
+  assertExists(choice.text);
+  
+  const tokens = choice.text.trim().split(/\s+/);
+  assert(tokens.length <= maxTokens, 
+    `Generated ${tokens.length} tokens, expected <= ${maxTokens}. Text: "${choice.text}"`);
+  
+  if (tokens.length === maxTokens) {
+    assertEquals(choice.finish_reason, "length", "Should indicate length limit was reached");
+  }
+});
+
+Deno.test("Completions endpoint - various max token sizes", async () => {
+  const testCases = [1, 3, 8, 15];
+  
+  for (const maxTokens of testCases) {
+    const requestBody = {
+      model: "test-model", 
+      prompt: "Generate some text",
+      max_tokens: maxTokens,
+      n: 1,
+    };
+
+    const response = await makeTestRequest("/v1/completions", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
+
+    assertEquals(response.status, 200);
+
+    const data = await response.json();
+    const choice = data.choices[0];
+    const tokens = choice.text.trim().split(/\s+/);
+    
+    assert(tokens.length <= maxTokens, 
+      `maxTokens=${maxTokens}: Generated ${tokens.length} tokens, expected <= ${maxTokens}`);
+  }
+});

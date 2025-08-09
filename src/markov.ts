@@ -60,11 +60,25 @@ function nextToken(
   const candidates: string[] = [];
   const weights: number[] = [];
 
+  // Check if we only have punctuation as options or very limited good options
+  const nonPunctuationOptions = Array.from(map.keys()).filter(token => !isPunctuationToken(token));
+  
+  // If we have very few options and punctuation dominates, 
+  // this suggests the current token is a poor continuation point
+  if (map.size <= 3 && (nonPunctuationOptions.length === 0 || 
+      nonPunctuationOptions.length === 1 && map.size === 2)) {
+    // Return null to trigger fallback to a better starting token
+    return null;
+  }
+
   for (const [token, count] of map.entries()) {
     candidates.push(token);
     // Penalise recently used tokens to reduce repetition
     const penalty = recentTokens.has(token) ? 0.1 : 1.0;
-    weights.push(count * penalty);
+    // Add smoothing to reduce bias towards high-frequency tokens
+    // Use square root to dampen the effect of frequency differences
+    const smoothedWeight = Math.sqrt(count) * penalty;
+    weights.push(smoothedWeight);
   }
 
   // Use weighted random selection instead of always picking the most probable
@@ -129,14 +143,32 @@ export function generateCorpusMarkovAnswer(
   if (!current) current = argMax(tokenCounts);
   if (!current) return { text: "", hitMaxLength: false };
 
-  const outTokens: string[] = [current];
+  const outTokens: string[] = [];
   const recentTokens = new Set<string>();
   const RECENT_WINDOW = 5; // Track last 5 tokens to avoid repetition
 
   let hitMax = false;
   while (outTokens.length < limit) {
     const next = nextToken(current, transitions, recentTokens);
-    if (!next) break;
+    if (!next) {
+      // If we can't continue from current token and we have no output yet,
+      // try to find a better starting token
+      if (outTokens.length === 0) {
+        // Find a random token that has good continuations
+        const tokensWithGoodContinuations = Array.from(transitions.keys()).filter(token => {
+          const nextOptions = transitions.get(token);
+          if (!nextOptions) return false;
+          const nonPunctuation = Array.from(nextOptions.keys()).filter(t => !isPunctuationToken(t));
+          return nonPunctuation.length > 1; // Has at least 2 non-punctuation options
+        });
+        
+        if (tokensWithGoodContinuations.length > 0) {
+          current = tokensWithGoodContinuations[Math.floor(Math.random() * tokensWithGoodContinuations.length)];
+          continue;
+        }
+      }
+      break;
+    }
 
     outTokens.push(next);
 
@@ -162,6 +194,6 @@ export function generateCorpusMarkovAnswer(
     }
   }
   text = normaliseWhitespace(text);
-  if (text.length > 0) text = text[0].toUpperCase() + text.slice(1);
+  if (text.length > 0) text = text[0].toLowerCase() + text.slice(1);
   return { text, hitMaxLength: hitMax };
 }
