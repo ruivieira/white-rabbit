@@ -72,6 +72,8 @@ WR_MODEL="my-custom-model" deno task start
 
 - `WR_MODEL` - Override the model name returned in API responses. If not set, defaults to
   `Qwen/Qwen2.5-1.5B-Instruct`.
+- `WR_HOST` - Set the host address to bind the server to. If not set, defaults to `localhost`.
+- `WR_PORT` - Set the port number for the server to listen on. If not set, defaults to `8000`.
 
 **Logging Configuration:**
 
@@ -88,6 +90,14 @@ deno task start
 
 # Or inline
 WR_MODEL="granite-3.1-8b" deno task start
+
+# Configure host and port
+export WR_HOST="0.0.0.0"
+export WR_PORT="8080"
+deno task start
+
+# Or inline
+WR_HOST="0.0.0.0" WR_PORT="8080" deno task start
 
 # Configure logging
 WR_LOG_LEVEL=INFO WR_LOG_PREFIX="MY_SERVER" deno task start
@@ -127,6 +137,15 @@ deno task start
 docker run -p 8000:8000 \
   -e WR_HF_DATASET="https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv" \
   -e WR_HF_COLUMN="text" \
+  white-rabbit:latest
+```
+
+**Using Docker with custom host and port:**
+
+```bash
+docker run -p 8080:8080 \
+  -e WR_HOST="0.0.0.0" \
+  -e WR_PORT="8080" \
   white-rabbit:latest
 ```
 
@@ -438,6 +457,12 @@ docker run -p 9000:8000 white-rabbit
 
 # Run with custom model name
 docker run -p 8000:8000 -e WR_MODEL="granite-3.1-8b" white-rabbit
+
+# Run with custom host and port
+docker run -p 8080:8080 \
+  -e WR_HOST="0.0.0.0" \
+  -e WR_PORT="8080" \
+  white-rabbit
 
 # Run with direct file dataset
 docker run -p 8000:8000 \

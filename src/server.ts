@@ -323,16 +323,16 @@ const LOGO = `             ,\\
     \\_|    )_-\\ \\_-\`
 jgs    \`-----\` \`--\``;
 
-function showStartupBanner(port: number): void {
+function showStartupBanner(port: number, host: string): void {
   const modelName = Deno.env.get("WR_MODEL") || "Qwen/Qwen2.5-1.5B-Instruct";
 
   console.log(`
 ${LOGO}
 
 🐰 White Rabbit vLLM Emulator
-🚀 Server running on port ${port}
+🚀 Server running on ${host}:${port}
 🤖 Model: ${modelName}
-🔗 Health check: http://localhost:${port}/health
+🔗 Health check: http://${host}:${port}/health
 📡 Endpoints:
    • POST /v1/chat/completions
    • POST /v1/completions
@@ -346,7 +346,7 @@ ${LOGO}
 `);
 
   logger.info("White Rabbit vLLM Emulator starting up", "server.ts", 300);
-  logger.info(`Server running on port ${port}`, "server.ts", 301);
+  logger.info(`Server running on ${host}:${port}`, "server.ts", 301);
   logger.info(`Model: ${modelName}`, "server.ts", 302);
   logger.info("Available routes:", "server.ts", 303);
   logger.info("Route: /health, Methods: GET", "server.ts", 304);
@@ -664,12 +664,14 @@ export async function handleRequest(req: Request): Promise<Response> {
 
 // Only start server if this is the main module
 if (import.meta.main) {
-  const port = 8000;
-  showStartupBanner(port);
+  const port = parseInt(Deno.env.get("WR_PORT") || "8000", 10);
+  const host = Deno.env.get("WR_HOST") || "localhost";
+
+  showStartupBanner(port, host);
   logger.info("Starting HTTP server", "server.ts", 579);
   startPeriodicStatsLogging();
 
-  serve(handleRequest, { port }).then(() => {
+  serve(handleRequest, { port, hostname: host }).then(() => {
     logger.info("HTTP server started successfully", "server.ts", 580);
   }).catch((error) => {
     logger.error(`Failed to start HTTP server: ${error}`, "server.ts", 582);
