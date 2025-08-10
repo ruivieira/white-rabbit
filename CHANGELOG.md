@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add configuration options for custom host and port in README and server startup ([f8afe95])
+
+### Other
+
+- Merge pull request #3 from ruivieira/port
+
+feat: Add configuration options for custom host and port in README an… ([bdcb255])
+
+## [0.3.0] - 2025-08-10
+
 ### Maintenance
 
 - Update changelog generation process to use git-cliff; remove old changelog script and adjust
@@ -14,6 +26,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Enhance dataset handling by adding support for direct file loading from Hugging Face; update
   README with configuration examples and improve corpus management ([6ea3ea8])
+
+- Bump version to 0.3.0 and update CHANGELOG with enhancements to dataset handling and README
+  improvements ([34e423d])
 
 ### Other
 
