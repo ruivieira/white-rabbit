@@ -12,11 +12,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Update changelog generation process to use git-cliff; remove old changelog script and adjust
   pre-commit configuration ([3560bc3])
 
+- Enhance dataset handling by adding support for direct file loading from Hugging Face; update
+  README with configuration examples and improve corpus management ([6ea3ea8])
+
 ### Other
 
 - Merge pull request #1 from ruivieira/changelog
 
 chore: Update changelog generation process to use git-cliff; remove o… ([e6b139d])
+
+- Merge pull request #2 from ruivieira/hugging-face
+
+chore: Enhance dataset handling by adding support for direct file loading from Hugging Face
+([5a0e7e2])
 
 ## [0.2.1] - 2025-08-09
 
