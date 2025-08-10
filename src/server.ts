@@ -12,7 +12,6 @@ import {
   StatsResponse,
   TokenizeRequest,
 } from "./api.ts";
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 // Initialize logger for this module
 const logger = initLogger("server");
@@ -671,12 +670,9 @@ if (import.meta.main) {
   logger.info("Starting HTTP server", "server.ts", 579);
   startPeriodicStatsLogging();
 
-  serve(handleRequest, { port, hostname: host }).then(() => {
-    logger.info("HTTP server started successfully", "server.ts", 580);
-  }).catch((error) => {
-    logger.error(`Failed to start HTTP server: ${error}`, "server.ts", 582);
-    stopPeriodicStatsLogging();
-  });
+  // Start serving requests with proper host binding
+  Deno.serve({ port, hostname: host }, handleRequest);
+  logger.info("HTTP server started successfully", "server.ts", 580);
 
   // Graceful shutdown
   Deno.addSignalListener("SIGINT", () => {
