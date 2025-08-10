@@ -15,7 +15,7 @@
     "fmt:check": "deno fmt --check",
     "lint": "deno lint",
     "check": "deno check src/**/*.ts tests/**/*.ts",
-    "changelog": "deno run -A tools/changelog.ts"
+    "changelog": "deno run -A tools/generate-changelog.ts"
   },
   "imports": {
     "@openai/openai": "jsr:@openai/openai@^4.73.1"

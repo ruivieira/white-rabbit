@@ -12,6 +12,14 @@ repos:
   # Custom hooks for Deno-specific tasks
   - repo: local
     hooks:
+      - id: changelog-generation
+        name: Generate Changelog
+        description: Regenerate changelog from git commits using git-cliff
+        entry: deno run -A tools/generate-changelog.ts
+        language: system
+        files: ^(src/|tests/|tools/|deno\.json|CHANGELOG\.md)
+        pass_filenames: false
+        stages: [manual]
       - id: deno-fmt
         name: Deno Format
         description: Format TypeScript/JavaScript code with Deno
@@ -40,14 +48,6 @@ repos:
         language: system
         files: \.(ts|tsx)$
         pass_filenames: false
-      - id: changelog-generation
-        name: Generate Changelog
-        description: Regenerate changelog from git commits
-        entry: deno run -A tools/changelog.ts
-        language: system
-        files: ^(src/|tests/|tools/|deno\.json|CHANGELOG\.md)
-        pass_filenames: false
-        stages: [pre-push]
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
