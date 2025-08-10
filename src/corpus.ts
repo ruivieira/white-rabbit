@@ -1,4 +1,4 @@
-export const corpus: string[] = [
+const defaultCorpus: string[] = [
   "William Shakespeare was an English playwright, widely regarded as the greatest writer in the English language.",
   "The town of Stratford-upon-Avon lies on the River Avon approximately one hundred and one miles northwest of London.",
   "During the Elizabethan era, the Globe Theatre became a centre for dramatic performance in London.",
@@ -376,3 +376,134 @@ export const corpus: string[] = [
   "The development of modern agriculture techniques has increased food production and supported growing global populations.",
   "Andy Warhol's pop art challenged traditional distinctions between high art and commercial culture in contemporary society.",
 ];
+
+async function loadDirectFileDataset(fileUrl: string): Promise<string[]> {
+  try {
+    console.log(`📥 Loading dataset from direct file URL: ${fileUrl}`);
+
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file: ${response.statusText}`);
+    }
+
+    console.log(`✅ File downloaded successfully (${response.status})`);
+    const fileContent = await response.text();
+    const targetColumn = Deno.env.get("WR_HF_COLUMN");
+
+    if (!targetColumn) {
+      throw new Error(
+        "WR_HF_COLUMN environment variable must be specified for direct file loading",
+      );
+    }
+
+    console.log(`🎯 Using column: ${targetColumn}`);
+
+    // Parse CSV content
+    console.log(`📊 Parsing CSV content...`);
+    const lines = fileContent.split("\n").filter((line) => line.trim().length > 0);
+    if (lines.length === 0) {
+      throw new Error("File is empty or contains no valid lines");
+    }
+
+    // Parse header row to find column index
+    const headers = parseCSVLine(lines[0]);
+    const columnIndex = headers.findIndex((header) => header.trim() === targetColumn);
+
+    if (columnIndex === -1) {
+      console.warn(`⚠️  Column '${targetColumn}' not found. Available columns:`, headers);
+      throw new Error(`Column '${targetColumn}' not found in dataset`);
+    }
+
+    console.log(`🎯 Found column '${targetColumn}' at index ${columnIndex}`);
+    console.log(`📋 Available columns:`, headers);
+
+    const texts: string[] = [];
+
+    // Process data rows (skip header)
+    console.log(`🔄 Processing ${lines.length - 1} data rows...`);
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCSVLine(lines[i]);
+      if (row.length > columnIndex) {
+        const text = row[columnIndex]?.trim();
+        if (text && text.length > 0) {
+          texts.push(text);
+        }
+      }
+    }
+
+    if (texts.length === 0) {
+      throw new Error("No text content found in specified column");
+    }
+
+    console.log(`✨ Successfully loaded ${texts.length} texts from file`);
+    return texts;
+  } catch (error) {
+    console.warn(`❌ Failed to load dataset from file '${fileUrl}':`, error);
+    console.log("🔄 Falling back to default corpus");
+    return defaultCorpus;
+  }
+}
+
+// Simple CSV parser that handles quoted fields and commas
+export function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // Escaped quote
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      // End of field
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  // Add the last field
+  result.push(current);
+
+  return result;
+}
+
+export async function getCorpus(): Promise<string[]> {
+  const datasetUrl = Deno.env.get("WR_HF_DATASET");
+  const targetColumn = Deno.env.get("WR_HF_COLUMN");
+
+  if (datasetUrl) {
+    if (!targetColumn) {
+      console.warn(
+        "⚠️  WR_HF_COLUMN environment variable must be specified for dataset loading. Falling back to default corpus.",
+      );
+      return defaultCorpus;
+    }
+
+    // Check if it's a direct file URL
+    if (
+      datasetUrl.includes("http") && (datasetUrl.includes(".csv") || datasetUrl.includes(".txt"))
+    ) {
+      return await loadDirectFileDataset(datasetUrl);
+    } else {
+      // Fallback to default corpus if not a direct file URL
+      console.warn(
+        "⚠️  Direct file URL expected for WR_HF_DATASET. Falling back to default corpus.",
+      );
+      return defaultCorpus;
+    }
+  }
+
+  return defaultCorpus;
+}
+
+export const corpus = defaultCorpus;

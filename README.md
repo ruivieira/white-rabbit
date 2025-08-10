@@ -96,13 +96,151 @@ WR_LOG_LEVEL=INFO WR_LOG_PREFIX="MY_SERVER" deno task start
 WR_LOG_COLORS=false deno task start
 ```
 
+## Direct File Dataset Configuration
+
+You can configure White Rabbit to use a custom dataset by setting the following environment
+variables:
+
+- `WR_HF_DATASET`: A direct URL to a CSV or text file (e.g.,
+  `https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv`)
+- `WR_HF_COLUMN`: The column name within the dataset to use for text generation
+
+**Important**: For Hugging Face datasets, use the `/resolve/` endpoint instead of `/blob/` to get
+the raw file content:
+
+- ❌ `https://huggingface.co/datasets/name/repo/blob/main/file.csv` (HTML page)
+- ✅ `https://huggingface.co/datasets/name/repo/resolve/main/file.csv` (raw file)
+
+### Examples
+
+**Using direct file URL (Recommended):**
+
+```bash
+export WR_HF_DATASET="https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv"
+export WR_HF_COLUMN="text"
+deno task start
+```
+
+**Using Docker with direct file URL:**
+
+```bash
+docker run -p 8000:8000 \
+  -e WR_HF_DATASET="https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv" \
+  -e WR_HF_COLUMN="text" \
+  white-rabbit:latest
+```
+
+### Example - Toxigen Dataset
+
+The toxigen dataset contains the following columns:
+
+- `text`: The input text prompt (use this for text generation)
+- `generation`: Generated text response
+- `generation_method`: Method used for generation
+- `group`: Group classification
+- `prompt_label`: Label for the prompt
+- `roberta_prediction`: RoBERTa model prediction
+
+For text generation, use `WR_HF_COLUMN="text"`.
+
 ## Supported Endpoints
 
-White Rabbit provides mock implementations of the following OpenAI-compatible endpoints:
+### Text Generation
 
-### Health Check
+- `POST /generate` - Generate text using Markov chains
+- `GET /health` - Health check endpoint
 
-- `GET /health` - Returns server status
+## Using Custom Hugging Face Datasets
+
+White Rabbit supports loading custom datasets directly from Hugging Face using the `/resolve/`
+endpoint. This allows you to train the Markov chain on any CSV dataset hosted on Hugging Face.
+
+### How It Works
+
+1. **Dataset Source**: The system fetches CSV files directly from Hugging Face using the `/resolve/`
+   endpoint
+2. **Column Selection**: You specify which column contains the text data for training
+3. **Automatic Parsing**: The system automatically parses the CSV and extracts the specified column
+4. **Markov Training**: The extracted text is used to train the Markov chain for text generation
+5. **Lazy Loading**: The dataset is loaded only when first needed, then cached in memory for
+   subsequent requests
+
+**Performance Note**: The first text generation request may experience a delay while the dataset
+downloads and processes. However, once loaded, the dataset is cached in memory, so all subsequent
+inference requests will be fast with no additional delays.
+
+### Example: Toxigen Dataset for Toxic Model Detection
+
+The [Toxigen dataset](https://huggingface.co/datasets/toxigen/toxigen-data) is particularly useful
+for testing and evaluating toxic content detection models. This dataset contains:
+
+- **Purpose**: Designed to test how well language models can detect and avoid generating toxic
+  content
+- **Content**: Contains prompts that are designed to elicit toxic responses from language models
+- **Use Case**: Perfect for testing whether your text generation system can avoid producing harmful
+  content
+
+#### Setting Up Toxigen Dataset
+
+```bash
+# Set the dataset URL (use /resolve/ for raw file access)
+export WR_HF_DATASET="https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv"
+
+# Specify the column containing the text prompts
+export WR_HF_COLUMN="text"
+
+# Start the server
+deno task start
+```
+
+#### Dataset Structure
+
+The toxigen dataset contains these columns:
+
+- `text`: The input text prompt (use this for text generation)
+- `generation`: Generated text response
+- `generation_method`: Method used for generation
+- `group`: Group classification
+- `prompt_label`: Label for the prompt
+- `roberta_prediction`: RoBERTa model prediction
+
+#### Testing Toxic Content Detection
+
+With the toxigen dataset loaded, you can:
+
+1. **Generate Text**: Use the `/generate` endpoint to create text based on the dataset
+2. **Evaluate Safety**: Check if the generated text maintains appropriate content standards
+3. **Model Testing**: Test how well your system handles potentially problematic prompts
+4. **Content Filtering**: Implement additional safety measures based on the generated content
+
+#### Example API Call
+
+```bash
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Write a story about",
+    "max_tokens": 100
+  }'
+```
+
+### Other Dataset Examples
+
+You can use any CSV dataset hosted on Hugging Face. Here are some other popular options:
+
+- **Creative Writing**:
+  `https://huggingface.co/datasets/writing-prompts/resolve/main/writing-prompts.csv`
+- **Conversation Data**:
+  `https://huggingface.co/datasets/conversation-ai/resolve/main/conversation.csv`
+- **Custom Datasets**: Upload your own CSV files to Hugging Face and use the `/resolve/` endpoint
+
+### Best Practices
+
+1. **Use `/resolve/` endpoint**: Always use `/resolve/` instead of `/blob/` for raw file access
+2. **Column validation**: Ensure the specified column exists and contains appropriate text data
+3. **Content review**: Review generated content, especially when using datasets with sensitive
+   content
+4. **Testing**: Test your system thoroughly before deploying with custom datasets
 
 ### Chat Completions
 
@@ -255,7 +393,8 @@ curl --request GET \
 - **Mock Data Generation**: Generates realistic-looking mock responses with random text and
   embeddings
 - **Markov completions**: Uses a small QA dataset and a weighted Markov chain to produce more
-  topic-relevant answers for `/v1/completions` and `/v1/chat/completions`.
+  topic-relevant answers for `/v1/completions` and `/v1/chat/completions`. Supports custom Hugging
+  Face datasets with configurable column extraction and format handling.
 - **OpenAI API Compatibility**: Follows OpenAI API specifications for request/response formats
 - **Multiple Input Support**: Supports single strings, arrays of strings, and token ID arrays
 - **Configurable Parameters**: Supports parameters like `max_tokens`, `n`, `logprobs`, `dimensions`,
@@ -299,6 +438,12 @@ docker run -p 9000:8000 white-rabbit
 
 # Run with custom model name
 docker run -p 8000:8000 -e WR_MODEL="granite-3.1-8b" white-rabbit
+
+# Run with direct file dataset
+docker run -p 8000:8000 \
+  -e WR_HF_DATASET="https://huggingface.co/datasets/toxigen/toxigen-data/resolve/main/toxigen.csv" \
+  -e WR_HF_COLUMN="prompt" \
+  white-rabbit
 ```
 
 ### Docker Features

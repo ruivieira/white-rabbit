@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Maintenance
+
+- Update changelog generation process to use git-cliff; remove old changelog script and adjust
+  pre-commit configuration ([3560bc3])
+
+### Other
+
+- Merge pull request #1 from ruivieira/changelog
+
+chore: Update changelog generation process to use git-cliff; remove o… ([e6b139d])
+
 ## [0.2.1] - 2025-08-09
 
 ### Added

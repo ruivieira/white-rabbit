@@ -413,7 +413,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       for (let i = 0; i < n; i++) {
         const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
         const seed = lastUser?.content ?? "";
-        let { text, hitMaxLength } = generateCorpusMarkovAnswer(seed, maxTokens);
+        let { text, hitMaxLength } = await generateCorpusMarkovAnswer(seed, maxTokens);
         if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
 
         let logprobs: {
@@ -481,7 +481,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       const choices: unknown[] = [];
 
       for (let i = 0; i < n; i++) {
-        let { text, hitMaxLength } = generateCorpusMarkovAnswer(promptStr, maxTokens);
+        let { text, hitMaxLength } = await generateCorpusMarkovAnswer(promptStr, maxTokens);
         if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
         if (body.echo) text = promptStr + text;
 
