@@ -1,11 +1,20 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@openai/openai@^4.73.1": "4.102.0"
+    "jsr:@openai/openai@^4.73.1": "4.102.0",
+    "npm:zod@3": "3.25.76"
   },
   "jsr": {
     "@openai/openai@4.102.0": {
-      "integrity": "ea5201bc5c8a696d3a5139a9cd2252e3ab9b2b880769a9cd7f05602ea1a02acf"
+      "integrity": "ea5201bc5c8a696d3a5139a9cd2252e3ab9b2b880769a9cd7f05602ea1a02acf",
+      "dependencies": [
+        "npm:zod"
+      ]
+    }
+  },
+  "npm": {
+    "zod@3.25.76": {
+      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
     }
   },
   "remote": {

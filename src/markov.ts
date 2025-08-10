@@ -1,4 +1,4 @@
-import { corpus } from "./corpus.ts";
+import { getCorpus } from "./corpus.ts";
 
 type TransitionCounts = Map<string, Map<string, number>>;
 
@@ -126,14 +126,26 @@ function buildGlobalChain(sentences: string[]): {
   return { startCounts, transitions, tokenCounts };
 }
 
-const GLOBAL_CHAIN = buildGlobalChain(corpus);
+let globalChainCache: {
+  startCounts: Map<string, number>;
+  transitions: TransitionCounts;
+  tokenCounts: Map<string, number>;
+} | null = null;
 
-export function generateCorpusMarkovAnswer(
+async function getGlobalChain() {
+  if (!globalChainCache) {
+    const corpus = await getCorpus();
+    globalChainCache = buildGlobalChain(corpus);
+  }
+  return globalChainCache;
+}
+
+export async function generateCorpusMarkovAnswer(
   prompt: string,
   maxTokens: number | null | undefined,
   respectMaxTokens: boolean = true,
-): { text: string; hitMaxLength: boolean } {
-  const { startCounts, transitions, tokenCounts } = GLOBAL_CHAIN;
+): Promise<{ text: string; hitMaxLength: boolean }> {
+  const { startCounts, transitions, tokenCounts } = await getGlobalChain();
   const limit = typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 40;
 
   const pTokens = tokenize(prompt);
