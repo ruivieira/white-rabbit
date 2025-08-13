@@ -1,5 +1,5 @@
 export interface BaseCompletionsRequest {
-  model: string;
+  model?: string | null;
   max_tokens?: number | null;
   n?: number;
   logprobs?: boolean;
@@ -20,7 +20,7 @@ export interface CompletionsRequest extends BaseCompletionsRequest {
 }
 
 export interface EmbeddingRequest {
-  model: string;
+  model?: string | null;
   input: string | string[] | number[] | number[][];
   encoding_format?: "float" | "base64";
   dimensions?: number;
@@ -47,7 +47,7 @@ export interface EmbeddingResponse {
 
 // New endpoint types
 export interface TokenizeRequest {
-  model: string;
+  model?: string | null;
   text: string;
   add_special_tokens?: boolean;
 }
@@ -59,7 +59,7 @@ export interface TokenizeResponse {
 }
 
 export interface DetokenizeRequest {
-  model: string;
+  model?: string | null;
   tokens: number[];
 }
 
