@@ -17,7 +17,7 @@ export interface LoggerConfig {
 }
 
 const DEFAULT_CONFIG: LoggerConfig = {
-  level: LogLevel.DEBUG,
+  level: LogLevel.INFO,
   prefix: "🐰",
   enableColors: true,
   dateFormat: "MM-DD HH:mm:ss",
@@ -143,6 +143,7 @@ function configureLogger(): void {
   const enableColors = Deno.env.get("WR_LOG_COLORS") !== "false";
 
   const config: Partial<LoggerConfig> = {
+    level: LogLevel.INFO, // Default level
     enableColors,
   };
 
@@ -161,6 +162,7 @@ function configureLogger(): void {
       case "ERROR":
         config.level = LogLevel.ERROR;
         break;
+        // Invalid levels will keep the default INFO level
     }
   }
 
@@ -169,6 +171,11 @@ function configureLogger(): void {
   }
 
   globalLogger.config = { ...globalLogger.config, ...config };
+}
+
+// Reconfigure logging based on current environment variables
+export function reconfigureLogger(): void {
+  configureLogger();
 }
 
 // Initialize logger configuration

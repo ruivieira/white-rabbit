@@ -1,7 +1,7 @@
 import { genParagraph } from "./text_generation.ts";
 import { generateCorpusMarkovAnswer } from "./markov.ts";
 import { getVersionInfo } from "./version.ts";
-import { initLogger } from "./logger.ts";
+import { initLogger, LogLevel } from "./logger.ts";
 import {
   ChatCompletionsRequest,
   CompletionsRequest,
@@ -13,8 +13,10 @@ import {
   TokenizeRequest,
 } from "./api.ts";
 
-// Initialize logger for this module
-const logger = initLogger("server");
+// Function to get the current logger for this module
+function getLogger() {
+  return initLogger("server");
+}
 
 // Get model name from environment variable, with fallback to default
 function getModelName(_requestModel: string): string {
@@ -64,7 +66,7 @@ function logPeriodicStats(): void {
   const uptime = Math.floor((now - serverStats.startTime) / 1000);
 
   // Log stats similar to vLLM format
-  logger.info(
+  getLogger().info(
     `Engine 000: Avg prompt throughput: ${promptThroughput.toFixed(1)} tokens/s, ` +
       `Avg generation throughput: ${generationThroughput.toFixed(1)} tokens/s, ` +
       `Running: ${serverStats.runningRequests} reqs, ` +
@@ -344,19 +346,19 @@ ${LOGO}
 💡 Ready to serve mock OpenAI-compatible responses!
 `);
 
-  logger.info("White Rabbit vLLM Emulator starting up", "server.ts", 300);
-  logger.info(`Server running on ${host}:${port}`, "server.ts", 301);
-  logger.info(`Model: ${modelName}`, "server.ts", 302);
-  logger.info("Available routes:", "server.ts", 303);
-  logger.info("Route: /health, Methods: GET", "server.ts", 304);
-  logger.info("Route: /v1/chat/completions, Methods: POST", "server.ts", 305);
-  logger.info("Route: /v1/completions, Methods: POST", "server.ts", 306);
-  logger.info("Route: /v1/embeddings, Methods: POST", "server.ts", 307);
-  logger.info("Route: /v1/models, Methods: GET", "server.ts", 308);
-  logger.info("Route: /tokenize, Methods: POST", "server.ts", 309);
-  logger.info("Route: /detokenize, Methods: POST", "server.ts", 310);
-  logger.info("Route: /version, Methods: GET", "server.ts", 311);
-  logger.info("Route: /stats, Methods: GET", "server.ts", 312);
+  getLogger().info("White Rabbit vLLM Emulator starting up", "server.ts", 346);
+  getLogger().info(`Server running on ${host}:${port}`, "server.ts", 347);
+  getLogger().info(`Model: ${modelName}`, "server.ts", 348);
+  getLogger().info("Available routes:", "server.ts", 349);
+  getLogger().info("Route: /health, Methods: GET", "server.ts", 350);
+  getLogger().info("Route: /v1/chat/completions, Methods: POST", "server.ts", 351);
+  getLogger().info("Route: /v1/completions, Methods: POST", "server.ts", 352);
+  getLogger().info("Route: /v1/embeddings, Methods: POST", "server.ts", 353);
+  getLogger().info("Route: /v1/models, Methods: GET", "server.ts", 354);
+  getLogger().info("Route: /tokenize, Methods: POST", "server.ts", 355);
+  getLogger().info("Route: /detokenize, Methods: POST", "server.ts", 356);
+  getLogger().info("Route: /version, Methods: GET", "server.ts", 357);
+  getLogger().info("Route: /stats, Methods: GET", "server.ts", 358);
 }
 
 function generateMockEmbedding(dimensions = 384): number[] {
@@ -376,26 +378,58 @@ async function parseJson<T>(req: Request): Promise<T | null> {
   }
 }
 
+// Request logging middleware for debug level
+async function logRequest(req: Request, url: URL): Promise<void> {
+  if (getLogger().config.level > LogLevel.DEBUG) return;
+
+  const method = req.method;
+  const pathname = url.pathname;
+  const headers = Object.fromEntries(req.headers.entries());
+
+  getLogger().debug(`=== HTTP Request Log ===`, "server.ts", 386);
+  getLogger().debug(`Method: ${method}`, "server.ts", 387);
+  getLogger().debug(`Path: ${pathname}`, "server.ts", 388);
+  getLogger().debug(`Headers: ${JSON.stringify(headers, null, 2)}`, "server.ts", 389);
+
+  // Log request body for POST requests
+  if (method === "POST") {
+    try {
+      const clonedReq = req.clone();
+      const body = await clonedReq.text();
+      if (body) {
+        getLogger().debug(`Body: ${body}`, "server.ts", 397);
+      }
+    } catch (error) {
+      getLogger().debug(`Failed to read request body: ${error}`, "server.ts", 400);
+    }
+  }
+
+  getLogger().debug(`=== End Request Log ===`, "server.ts", 404);
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
+
+  // Log request details if debug level is enabled
+  await logRequest(req, url);
 
   // Track request statistics
   serverStats.totalRequests++;
   serverStats.runningRequests++;
 
-  logger.debug(`Incoming ${req.method} request to ${url.pathname}`, "server.ts", 327);
+  getLogger().debug(`Incoming ${req.method} request to ${url.pathname}`, "server.ts", 417);
 
   try {
     if (req.method === "GET" && url.pathname === "/health") {
-      logger.debug("Health check request", "server.ts", 331);
+      getLogger().debug("Health check request", "server.ts", 421);
       return json({ status: "ok" });
     }
 
     if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
-      logger.info("Processing chat completion request", "server.ts", 335);
+      getLogger().info("Processing chat completion request", "server.ts", 426);
       const body = await parseJson<ChatCompletionsRequest>(req);
       if (!body || !body.model || !Array.isArray(body.messages)) {
-        logger.warning("Invalid chat completion request body", "server.ts", 338);
+        getLogger().warning("Invalid chat completion request body", "server.ts", 429);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -454,15 +488,15 @@ export async function handleRequest(req: Request): Promise<Response> {
         },
         prompt_logprobs: null,
       };
-      logger.info(`Chat completion generated: ${generatedTokens} tokens`, "server.ts", 389);
+      getLogger().info(`Chat completion generated: ${generatedTokens} tokens`, "server.ts", 488);
       return json(resp);
     }
 
     if (req.method === "POST" && url.pathname === "/v1/completions") {
-      logger.info("Processing completion request", "server.ts", 393);
+      getLogger().info("Processing completion request", "server.ts", 493);
       const body = await parseJson<CompletionsRequest>(req);
       if (!body || !body.model || typeof body.prompt === "undefined") {
-        logger.warning("Invalid completion request body", "server.ts", 396);
+        getLogger().warning("Invalid completion request body", "server.ts", 496);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -530,10 +564,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     if (req.method === "POST" && url.pathname === "/v1/embeddings") {
-      logger.info("Processing embedding request", "server.ts", 456);
+      getLogger().info("Processing embedding request", "server.ts", 564);
       const body = await parseJson<EmbeddingRequest>(req);
       if (!body || !body.model || !body.input) {
-        logger.warning("Invalid embedding request body", "server.ts", 459);
+        getLogger().warning("Invalid embedding request body", "server.ts", 567);
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -584,7 +618,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /v1/models - List available models
     if (req.method === "GET" && url.pathname === "/v1/models") {
-      logger.debug("Listing available models", "server.ts", 508);
+      getLogger().debug("Listing available models", "server.ts", 618);
       const response: ModelsResponse = {
         object: "list",
         data: getAvailableModels(),
@@ -594,10 +628,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // POST /tokenize - Tokenize text
     if (req.method === "POST" && url.pathname === "/tokenize") {
-      logger.debug("Processing tokenize request", "server.ts", 517);
+      getLogger().debug("Processing tokenize request", "server.ts", 628);
       const body = await parseJson<TokenizeRequest>(req);
       if (!body || !body.model || typeof body.text !== "string") {
-        logger.warning("Invalid tokenize request body", "server.ts", 520);
+        getLogger().warning("Invalid tokenize request body", "server.ts", 631);
         return json({ error: "Invalid request body. Required fields: model, text" }, 400);
       }
 
@@ -612,10 +646,10 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // POST /detokenize - Convert tokens back to text
     if (req.method === "POST" && url.pathname === "/detokenize") {
-      logger.debug("Processing detokenize request", "server.ts", 533);
+      getLogger().debug("Processing detokenize request", "server.ts", 646);
       const body = await parseJson<DetokenizeRequest>(req);
       if (!body || !body.model || !Array.isArray(body.tokens)) {
-        logger.warning("Invalid detokenize request body", "server.ts", 536);
+        getLogger().warning("Invalid detokenize request body", "server.ts", 649);
         return json({ error: "Invalid request body. Required fields: model, tokens" }, 400);
       }
 
@@ -628,7 +662,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /version - Return vLLM version info
     if (req.method === "GET" && url.pathname === "/version") {
-      logger.debug("Processing version request", "server.ts", 547);
+      getLogger().debug("Processing version request", "server.ts", 662);
       const includeDetails = url.searchParams.get("details") === "true";
       const versionInfo = getVersionInfo(includeDetails);
       return json(versionInfo);
@@ -636,7 +670,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // GET /stats - Return server statistics
     if (req.method === "GET" && url.pathname === "/stats") {
-      logger.debug("Processing stats request", "server.ts", 554);
+      getLogger().debug("Processing stats request", "server.ts", 670);
       const _uptime = Date.now() - serverStats.startTime;
       const response: StatsResponse = {
         num_requests: serverStats.totalRequests,
@@ -650,10 +684,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       return json(response);
     }
 
-    logger.warning(`Route not found: ${req.method} ${url.pathname}`, "server.ts", 568);
+    getLogger().warning(`Route not found: ${req.method} ${url.pathname}`, "server.ts", 684);
     return json({ error: "Not found" }, 404);
   } catch (error) {
-    logger.error(`Request processing error: ${error}`, "server.ts", 571);
+    getLogger().error(`Request processing error: ${error}`, "server.ts", 687);
     return json({ error: "Internal server error" }, 500);
   } finally {
     // Decrement running requests counter
@@ -667,22 +701,22 @@ if (import.meta.main) {
   const host = Deno.env.get("WR_HOST") || "0.0.0.0";
 
   showStartupBanner(port, host);
-  logger.info("Starting HTTP server", "server.ts", 579);
+  getLogger().info("Starting HTTP server", "server.ts", 701);
   startPeriodicStatsLogging();
 
   // Start serving requests with proper host binding
   Deno.serve({ port, hostname: host }, handleRequest);
-  logger.info("HTTP server started successfully", "server.ts", 580);
+  getLogger().info("HTTP server started successfully", "server.ts", 706);
 
   // Graceful shutdown
   Deno.addSignalListener("SIGINT", () => {
-    logger.info("Received SIGINT, shutting down gracefully", "server.ts", 588);
+    getLogger().info("Received SIGINT, shutting down gracefully", "server.ts", 710);
     stopPeriodicStatsLogging();
     Deno.exit(0);
   });
 
   Deno.addSignalListener("SIGTERM", () => {
-    logger.info("Received SIGTERM, shutting down gracefully", "server.ts", 593);
+    getLogger().info("Received SIGTERM, shutting down gracefully", "server.ts", 711);
     stopPeriodicStatsLogging();
     Deno.exit(0);
   });

@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { assert, assertEquals, assertExists } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { handleRequest } from "../src/server.ts";
+import { reconfigureLogger } from "../src/logger.ts";
 
 async function makeTestRequest(path: string, options: RequestInit = {}): Promise<Response> {
   const url = `http://localhost:8000${path}`;
@@ -453,4 +454,214 @@ Deno.test("Chat completions endpoint - high max tokens test", async () => {
 
   // Should hit the length limit due to aggressive fallback
   assertEquals(choice.finish_reason, "length", "Should hit length limit with aggressive fallback");
+});
+
+Deno.test("Request logging - DEBUG level logs request details", async () => {
+  // Set environment variable for this test
+  const originalLogLevel = Deno.env.get("WR_LOG_LEVEL");
+  Deno.env.set("WR_LOG_LEVEL", "DEBUG");
+
+  // Reconfigure the logger to pick up the new environment variable
+  reconfigureLogger();
+
+  // Capture console output
+  let logOutput = "";
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  try {
+    console.log = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+    console.error = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+
+    // Make a request that should trigger logging
+    const requestBody = {
+      model: "test-model",
+      messages: [{ role: "user", content: "Hello world" }],
+    };
+
+    const response = await makeTestRequest("/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
+
+    assertEquals(response.status, 200);
+
+    // Check that request logging occurred
+    assert(logOutput.includes("=== HTTP Request Log ==="), "Should log request start marker");
+    assert(logOutput.includes("Method: POST"), "Should log HTTP method");
+    assert(logOutput.includes("Path: /v1/chat/completions"), "Should log request path");
+    assert(logOutput.includes("Body:"), "Should log request body");
+    assert(logOutput.includes("Hello world"), "Should log request body content");
+    assert(logOutput.includes("=== End Request Log ==="), "Should log request end marker");
+  } finally {
+    // Restore original environment and console
+    if (originalLogLevel) {
+      Deno.env.set("WR_LOG_LEVEL", originalLogLevel);
+    } else {
+      Deno.env.delete("WR_LOG_LEVEL");
+    }
+    // Reconfigure back to original settings
+    reconfigureLogger();
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+Deno.test("Request logging - INFO level does not log request details", async () => {
+  // Set environment variable for this test
+  const originalLogLevel = Deno.env.get("WR_LOG_LEVEL");
+  Deno.env.set("WR_LOG_LEVEL", "INFO");
+
+  // Reconfigure the logger to pick up the new environment variable
+  reconfigureLogger();
+
+  // Capture console output
+  let logOutput = "";
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  try {
+    console.log = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+    console.error = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+
+    // Make a request that should NOT trigger detailed logging
+    const requestBody = {
+      model: "test-model",
+      messages: [{ role: "user", content: "Hello world" }],
+    };
+
+    const response = await makeTestRequest("/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
+
+    assertEquals(response.status, 200);
+
+    // Check that detailed request logging did NOT occur
+    assert(
+      !logOutput.includes("=== HTTP Request Log ==="),
+      "Should not log request start marker at INFO level",
+    );
+    assert(!logOutput.includes("Method: POST"), "Should not log HTTP method at INFO level");
+    assert(!logOutput.includes("Body:"), "Should not log request body at INFO level");
+
+    // But basic request processing should still be logged
+    assert(
+      logOutput.includes("Processing chat completion request"),
+      "Should still log processing info",
+    );
+  } finally {
+    // Restore original environment and console
+    if (originalLogLevel) {
+      Deno.env.set("WR_LOG_LEVEL", originalLogLevel);
+    } else {
+      Deno.env.delete("WR_LOG_LEVEL");
+    }
+    // Reconfigure back to original settings
+    reconfigureLogger();
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+Deno.test("Request logging - GET requests logged without body", async () => {
+  // Set environment variable for this test
+  const originalLogLevel = Deno.env.get("WR_LOG_LEVEL");
+  Deno.env.set("WR_LOG_LEVEL", "DEBUG");
+
+  // Reconfigure the logger to pick up the new environment variable
+  reconfigureLogger();
+
+  // Capture console output
+  let logOutput = "";
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  try {
+    console.log = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+    console.error = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+
+    // Make a GET request
+    const response = await makeTestRequest("/health");
+
+    assertEquals(response.status, 200);
+
+    // Check that request logging occurred but without body
+    assert(logOutput.includes("=== HTTP Request Log ==="), "Should log request start marker");
+    assert(logOutput.includes("Method: GET"), "Should log HTTP method");
+    assert(logOutput.includes("Path: /health"), "Should log request path");
+    assert(!logOutput.includes("Body:"), "Should not log body for GET requests");
+    assert(logOutput.includes("=== End Request Log ==="), "Should log request end marker");
+  } finally {
+    // Restore original environment and console
+    if (originalLogLevel) {
+      Deno.env.set("WR_LOG_LEVEL", originalLogLevel);
+    } else {
+      Deno.env.delete("WR_LOG_LEVEL");
+    }
+    // Reconfigure back to original settings
+    reconfigureLogger();
+    console.log = originalLog;
+    console.error = originalError;
+  }
+});
+
+Deno.test("Request logging - handles malformed JSON gracefully", async () => {
+  // Set environment variable for this test
+  const originalLogLevel = Deno.env.get("WR_LOG_LEVEL");
+  Deno.env.set("WR_LOG_LEVEL", "DEBUG");
+
+  // Reconfigure the logger to pick up the new environment variable
+  reconfigureLogger();
+
+  // Capture console output
+  let logOutput = "";
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  try {
+    console.log = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+    console.error = (msg: string) => {
+      logOutput += msg + "\n";
+    };
+
+    // Make a request with malformed JSON
+    const response = await makeTestRequest("/v1/chat/completions", {
+      method: "POST",
+      body: "invalid json{",
+    });
+
+    assertEquals(response.status, 400);
+
+    // Check that request logging occurred and handled the error gracefully
+    assert(logOutput.includes("=== HTTP Request Log ==="), "Should log request start marker");
+    assert(logOutput.includes("Method: POST"), "Should log HTTP method");
+    assert(logOutput.includes("Body: invalid json{"), "Should log the malformed body");
+    assert(logOutput.includes("=== End Request Log ==="), "Should log request end marker");
+  } finally {
+    // Restore original environment and console
+    if (originalLogLevel) {
+      Deno.env.set("WR_LOG_LEVEL", originalLogLevel);
+    } else {
+      Deno.env.delete("WR_LOG_LEVEL");
+    }
+    // Reconfigure back to original settings
+    reconfigureLogger();
+    console.log = originalLog;
+    console.error = originalError;
+  }
 });
