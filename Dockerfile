@@ -60,12 +60,16 @@ RUN chown whiterabbit:whiterabbit /app/white-rabbit && \
 # Switch to non-root user
 USER whiterabbit
 
+# Set environment variables for server configuration
+ENV WR_HOST=0.0.0.0
+ENV WR_PORT=8000
+
 # Expose port
 EXPOSE 8000
 
 # Health check (curl-minimal is available in ubi-minimal)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://0.0.0.0:8000/health || exit 1
 
 # Start the emulator
 CMD ["./white-rabbit"]

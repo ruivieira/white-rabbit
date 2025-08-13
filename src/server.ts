@@ -664,7 +664,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 // Only start server if this is the main module
 if (import.meta.main) {
   const port = parseInt(Deno.env.get("WR_PORT") || "8000", 10);
-  const host = Deno.env.get("WR_HOST") || "localhost";
+  const host = Deno.env.get("WR_HOST") || "0.0.0.0";
 
   showStartupBanner(port, host);
   logger.info("Starting HTTP server", "server.ts", 579);
