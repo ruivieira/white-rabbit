@@ -77,9 +77,16 @@ WR_MODEL="my-custom-model" deno task start
 
 **Logging Configuration:**
 
-- `WR_LOG_LEVEL` - Set logging level: `DEBUG`, `INFO`, `WARNING`, or `ERROR` (default: `DEBUG`)
-- `WR_LOG_PREFIX` - Customise log message prefix (default: `WHITE_RABBIT`)
+- `WR_LOG_LEVEL` - Set logging level: `DEBUG`, `INFO`, `WARNING`, or `ERROR` (default: `INFO`)
+- `WR_LOG_PREFIX` - Customise log message prefix (default: `🐰`)
 - `WR_LOG_COLORS` - Enable/disable coloured log output: `true` or `false` (default: `true`)
+
+**Log Levels:**
+
+- `DEBUG` - Includes detailed HTTP request logging with headers and body payloads
+- `INFO` - Standard logging without detailed request information
+- `WARNING` - Only warnings and errors
+- `ERROR` - Only error messages
 
 **Examples:**
 
@@ -100,7 +107,7 @@ deno task start
 WR_HOST="0.0.0.0" WR_PORT="8080" deno task start
 
 # Configure logging
-WR_LOG_LEVEL=INFO WR_LOG_PREFIX="MY_SERVER" deno task start
+WR_LOG_LEVEL=DEBUG WR_LOG_PREFIX="MY_SERVER" deno task start
 
 # Disable coloured logs (useful for log files)
 WR_LOG_COLORS=false deno task start
@@ -433,9 +440,46 @@ curl --request GET \
   - Running and total request counts
   - Server uptime tracking
 - **Request Tracing**: Debug-level logging of all incoming requests and processing steps
+- **HTTP Request Logging**: When `LOG_LEVEL=DEBUG`, logs all HTTP requests with method, path,
+  headers, and body payloads
 - **Configurable Log Levels**: DEBUG, INFO, WARNING, ERROR with environment variable control
 - **Coloured Output**: Colour-coded log messages for easy reading (configurable)
 - **Graceful Shutdown**: Proper signal handling and resource cleanup
+
+### HTTP Request Logging
+
+When `WR_LOG_LEVEL=DEBUG` is set, White Rabbit provides comprehensive HTTP request logging that
+includes:
+
+- **Request Method**: HTTP method (GET, POST, etc.)
+- **Request Path**: Full URL path
+- **Request Headers**: All HTTP headers with values
+- **Request Body**: Complete request body payload for POST requests
+- **Structured Format**: Clear markers to identify request log boundaries
+
+This is particularly useful for:
+
+- **Debugging**: Troubleshooting API integration issues
+- **Development**: Understanding exactly what clients are sending
+- **Testing**: Verifying request payloads during development
+- **Monitoring**: Tracking API usage patterns
+
+**Example DEBUG level output:**
+
+```
+🐰:server DEBUG 08-13 17:45:49 [server.ts:386] === HTTP Request Log ===
+🐰:server DEBUG 08-13 17:45:49 [server.ts:387] Method: POST
+🐰:server DEBUG 08-13 17:45:49 [server.ts:388] Path: /v1/chat/completions
+🐰:server DEBUG 08-13 17:45:49 [server.ts:389] Headers: {
+  "content-type": "application/json",
+  "user-agent": "curl/7.68.0"
+}
+🐰:server DEBUG 08-13 17:45:49 [server.ts:397] Body: {"model":"test","messages":[{"role":"user","content":"Hello"}]}
+🐰:server DEBUG 08-13 17:45:49 [server.ts:404] === End Request Log ===
+```
+
+**Note**: Request body logging is only performed for POST requests. GET requests will log method,
+path, and headers but not body content.
 
 Any string is accepted for the `model` argument across all endpoints. However, the actual model name
 returned in responses is determined by the `WR_MODEL` environment variable (or the default
