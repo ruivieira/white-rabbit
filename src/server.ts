@@ -429,7 +429,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       getLogger().info("Processing chat completion request", "server.ts", 426);
       const body = await parseJson<ChatCompletionsRequest>(req);
       if (!body || !body.model || !Array.isArray(body.messages)) {
-        getLogger().warning("Invalid chat completion request body", "server.ts", 429);
+        getLogger().warning(
+          `Invalid chat completion request body: ${JSON.stringify(body)}`,
+          "server.ts",
+          429,
+        );
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -496,7 +500,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       getLogger().info("Processing completion request", "server.ts", 493);
       const body = await parseJson<CompletionsRequest>(req);
       if (!body || !body.model || typeof body.prompt === "undefined") {
-        getLogger().warning("Invalid completion request body", "server.ts", 496);
+        getLogger().warning(
+          `Invalid completion request body: ${JSON.stringify(body)}`,
+          "server.ts",
+          496,
+        );
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -567,7 +575,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       getLogger().info("Processing embedding request", "server.ts", 564);
       const body = await parseJson<EmbeddingRequest>(req);
       if (!body || !body.model || !body.input) {
-        getLogger().warning("Invalid embedding request body", "server.ts", 567);
+        getLogger().warning(
+          `Invalid embedding request body: ${JSON.stringify(body)}`,
+          "server.ts",
+          567,
+        );
         return json({ error: "Invalid request body" }, 400);
       }
 
@@ -631,7 +643,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       getLogger().debug("Processing tokenize request", "server.ts", 628);
       const body = await parseJson<TokenizeRequest>(req);
       if (!body || !body.model || typeof body.text !== "string") {
-        getLogger().warning("Invalid tokenize request body", "server.ts", 631);
+        getLogger().warning(
+          `Invalid tokenize request body: ${JSON.stringify(body)}`,
+          "server.ts",
+          631,
+        );
         return json({ error: "Invalid request body. Required fields: model, text" }, 400);
       }
 
@@ -649,7 +665,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       getLogger().debug("Processing detokenize request", "server.ts", 646);
       const body = await parseJson<DetokenizeRequest>(req);
       if (!body || !body.model || !Array.isArray(body.tokens)) {
-        getLogger().warning("Invalid detokenize request body", "server.ts", 649);
+        getLogger().warning(
+          `Invalid detokenize request body: ${JSON.stringify(body)}`,
+          "server.ts",
+          649,
+        );
         return json({ error: "Invalid request body. Required fields: model, tokens" }, 400);
       }
 
