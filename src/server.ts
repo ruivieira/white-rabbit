@@ -407,6 +407,100 @@ async function logRequest(req: Request, url: URL): Promise<void> {
   getLogger().debug(`=== End Request Log ===`, "server.ts", 404);
 }
 
+// RAGAS detection and response generation
+function isRAGASPrompt(prompt: string): boolean {
+  const ragasPatterns = [
+    /Generate a question for the given answer/i,
+    /Identify if answer is noncommittal/i,
+    /noncommittal answer is one that is evasive, vague, or ambiguous/i,
+    /JSON Schema/i,
+    /ResponseRelevanceOutput/i,
+  ];
+
+  return ragasPatterns.some((pattern) => pattern.test(prompt));
+}
+
+function generateRAGASResponse(prompt: string): string {
+  // Generate randomised values for more realistic responses
+  const randomScore = () => Math.round((Math.random() * 0.4 + 0.6) * 100) / 100; // 0.6 to 1.0
+  const randomNoncommittal = () => Math.random() > 0.5 ? 1 : 0;
+
+  // Sample questions for variety
+  const sampleQuestions = [
+    "What is your favourite colour?",
+    "How do you feel about this topic?",
+    "What are your thoughts on this matter?",
+    "Can you elaborate on this point?",
+    "What is your opinion on this issue?",
+  ];
+
+  // Sample explanations for variety
+  const sampleExplanations = [
+    "The response is relevant to the query",
+    "The answer addresses the question appropriately",
+    "The content is well-aligned with the request",
+    "The response provides useful information",
+    "The answer is pertinent to the topic",
+  ];
+
+  // Extract the type of RAGAS task from the prompt
+  if (prompt.includes("Generate a question for the given answer")) {
+    // For question generation + noncommittal detection
+    return JSON.stringify(
+      {
+        question: sampleQuestions[Math.floor(Math.random() * sampleQuestions.length)],
+        noncommittal: randomNoncommittal(),
+      },
+      null,
+      2,
+    );
+  }
+
+  // Handle other RAGAS evaluation types
+  if (prompt.includes("relevance") || prompt.includes("RelevanceOutput")) {
+    return JSON.stringify(
+      {
+        relevance: randomScore(),
+        explanation: sampleExplanations[Math.floor(Math.random() * sampleExplanations.length)],
+      },
+      null,
+      2,
+    );
+  }
+
+  if (prompt.includes("faithfulness") || prompt.includes("FaithfulnessOutput")) {
+    return JSON.stringify(
+      {
+        faithfulness: randomScore(),
+        explanation: sampleExplanations[Math.floor(Math.random() * sampleExplanations.length)],
+      },
+      null,
+      2,
+    );
+  }
+
+  if (prompt.includes("context_relevancy") || prompt.includes("ContextRelevancyOutput")) {
+    return JSON.stringify(
+      {
+        context_relevancy: randomScore(),
+        explanation: sampleExplanations[Math.floor(Math.random() * sampleExplanations.length)],
+      },
+      null,
+      2,
+    );
+  }
+
+  // Default RAGAS response for question generation
+  return JSON.stringify(
+    {
+      question: sampleQuestions[Math.floor(Math.random() * sampleQuestions.length)],
+      noncommittal: randomNoncommittal(),
+    },
+    null,
+    2,
+  );
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
 
@@ -450,8 +544,22 @@ export async function handleRequest(req: Request): Promise<Response> {
       for (let i = 0; i < n; i++) {
         const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
         const seed = lastUser?.content ?? "";
-        let { text, hitMaxLength } = await generateCorpusMarkovAnswer(seed, maxTokens);
-        if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
+        let text: string;
+        let hitMaxLength: boolean;
+
+        // Check if this is a RAGAS prompt
+        if (isRAGASPrompt(seed)) {
+          getLogger().info(
+            "RAGAS prompt detected in chat completion, generating structured response",
+            "server.ts",
+            460,
+          );
+          text = generateRAGASResponse(seed);
+          hitMaxLength = false;
+        } else {
+          ({ text, hitMaxLength } = await generateCorpusMarkovAnswer(seed, maxTokens));
+          if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
+        }
 
         let logprobs: {
           content: Array<
@@ -522,9 +630,23 @@ export async function handleRequest(req: Request): Promise<Response> {
       const choices: unknown[] = [];
 
       for (let i = 0; i < n; i++) {
-        let { text, hitMaxLength } = await generateCorpusMarkovAnswer(promptStr, maxTokens);
-        if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
-        if (body.echo) text = promptStr + text;
+        let text: string;
+        let hitMaxLength: boolean;
+
+        // Check if this is a RAGAS prompt
+        if (isRAGASPrompt(promptStr)) {
+          getLogger().info(
+            "RAGAS prompt detected, generating structured response",
+            "server.ts",
+            520,
+          );
+          text = generateRAGASResponse(promptStr);
+          hitMaxLength = false;
+        } else {
+          ({ text, hitMaxLength } = await generateCorpusMarkovAnswer(promptStr, maxTokens));
+          if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
+          if (body.echo) text = promptStr + text;
+        }
 
         const tokensInResponse = text.trim().length ? text.trim().split(/\s+/).length : 0;
         serverStats.generationTokens += tokensInResponse;
