@@ -531,6 +531,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       return json({ status: "ok" });
     }
 
+    if (req.method === "GET" && url.pathname === "/") {
+      getLogger().debug("Root endpoint request", "server.ts", 425);
+      return json({ status: "ready", service: "white-rabbit" });
+    }
+
     if (req.method === "POST" && url.pathname === "/v1/chat/completions") {
       getLogger().info("Processing chat completion request", "server.ts", 426);
       const body = await parseJson<ChatCompletionsRequest>(req);
