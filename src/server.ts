@@ -343,6 +343,7 @@ ${LOGO}
    • POST /detokenize
    • GET /version
    • GET /stats
+   • GET /metrics
 💡 Ready to serve mock OpenAI-compatible responses!
 `);
 
@@ -359,6 +360,7 @@ ${LOGO}
   getLogger().info("Route: /detokenize, Methods: POST", "server.ts", 356);
   getLogger().info("Route: /version, Methods: GET", "server.ts", 357);
   getLogger().info("Route: /stats, Methods: GET", "server.ts", 358);
+  getLogger().info("Route: /metrics, Methods: GET", "server.ts", 359);
 }
 
 function generateMockEmbedding(dimensions = 384): number[] {
@@ -502,7 +504,17 @@ function generateRAGASResponse(prompt: string): string {
 }
 
 export async function handleRequest(req: Request): Promise<Response> {
-  const url = new URL(req.url);
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch (error) {
+    // Handle malformed URLs from KServe health checks
+    getLogger().debug(`Malformed URL in request: ${req.url}, error: ${error}`, "server.ts", 505);
+    // Try to extract pathname from malformed URL
+    const match = req.url.match(/^https?:\/\/[^\/]*(.*)$/) || req.url.match(/^(.*)$/);
+    const pathname = match ? match[1] || "/" : "/";
+    url = { pathname, search: "", searchParams: new URLSearchParams() } as URL;
+  }
 
   // Log request details if debug level is enabled
   await logRequest(req, url);
@@ -824,6 +836,40 @@ export async function handleRequest(req: Request): Promise<Response> {
         num_preemptions: Math.floor(Math.random() * 10), // Mock preemptions
       };
       return json(response);
+    }
+
+    // GET /metrics - Return Prometheus-compatible metrics
+    if (req.method === "GET" && url.pathname === "/metrics") {
+      getLogger().debug("Processing metrics request", "server.ts", 685);
+      const uptime = Math.floor((Date.now() - serverStats.startTime) / 1000);
+      const metrics = `# HELP white_rabbit_requests_total Total number of requests processed
+# TYPE white_rabbit_requests_total counter
+white_rabbit_requests_total ${serverStats.totalRequests}
+
+# HELP white_rabbit_requests_running Number of requests currently being processed
+# TYPE white_rabbit_requests_running gauge
+white_rabbit_requests_running ${serverStats.runningRequests}
+
+# HELP white_rabbit_tokens_prompt_total Total number of prompt tokens processed
+# TYPE white_rabbit_tokens_prompt_total counter
+white_rabbit_tokens_prompt_total ${serverStats.promptTokens}
+
+# HELP white_rabbit_tokens_generation_total Total number of generation tokens produced
+# TYPE white_rabbit_tokens_generation_total counter
+white_rabbit_tokens_generation_total ${serverStats.generationTokens}
+
+# HELP white_rabbit_uptime_seconds Server uptime in seconds
+# TYPE white_rabbit_uptime_seconds gauge
+white_rabbit_uptime_seconds ${uptime}
+
+# HELP white_rabbit_info Server information
+# TYPE white_rabbit_info gauge
+white_rabbit_info{version="0.2.0",model="${getModelName("")}"} 1
+`;
+      return new Response(metrics, {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      });
     }
 
     getLogger().warning(`Route not found: ${req.method} ${url.pathname}`, "server.ts", 684);
