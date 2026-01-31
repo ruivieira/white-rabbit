@@ -6,9 +6,18 @@ export interface BaseCompletionsRequest {
   echo?: boolean;
 }
 
+export interface ContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: string;
+  };
+}
+
 export interface ChatMessage {
   role: string;
-  content: string;
+  content: string | ContentPart[];
 }
 
 export interface ChatCompletionsRequest extends BaseCompletionsRequest {
