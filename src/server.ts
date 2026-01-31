@@ -5,6 +5,7 @@ import { initLogger, LogLevel } from "./logger.ts";
 import {
   ChatCompletionsRequest,
   CompletionsRequest,
+  ContentPart,
   DetokenizeRequest,
   EmbeddingRequest,
   ModelInfo,
@@ -38,6 +39,31 @@ function systemFingerprint(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Normalize message content to string.
+ * OpenAI API supports both string and array of content parts (for multimodal).
+ * This function extracts text from either format.
+ */
+function normalizeContent(content: string | ContentPart[] | null | undefined): string {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+
+  // Handle array of content parts (multimodal format)
+  if (Array.isArray(content)) {
+    return content
+      .map((part: ContentPart) => {
+        if (part.type === "text" && part.text) {
+          return part.text;
+        }
+        return "";
+      })
+      .join(" ")
+      .trim();
+  }
+
+  return "";
 }
 
 function countWords(text: string): number {
@@ -552,7 +578,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       const maxTokens = body.max_tokens ?? null;
       const wantLogprobs = Boolean(body.logprobs);
 
-      const promptTokens = body.messages.reduce((acc, m) => acc + countWords(m.content ?? ""), 0);
+      const promptTokens = body.messages.reduce(
+        (acc, m) => acc + countWords(normalizeContent(m.content)),
+        0,
+      );
       serverStats.promptTokens += promptTokens;
 
       const choices: unknown[] = [];
@@ -560,7 +589,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
       for (let i = 0; i < n; i++) {
         const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-        const seed = lastUser?.content ?? "";
+        const seed = normalizeContent(lastUser?.content);
         let text: string;
         let hitMaxLength: boolean;
 
