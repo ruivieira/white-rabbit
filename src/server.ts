@@ -5,6 +5,7 @@ import { initLogger, LogLevel } from "./logger.ts";
 import {
   ChatCompletionsRequest,
   CompletionsRequest,
+  ContentPart,
   DetokenizeRequest,
   EmbeddingRequest,
   ModelInfo,
@@ -45,15 +46,14 @@ function systemFingerprint(): string {
  * OpenAI API supports both string and array of content parts (for multimodal).
  * This function extracts text from either format.
  */
-function normalizeContent(content: string | unknown[] | null | undefined): string {
+function normalizeContent(content: string | ContentPart[] | null | undefined): string {
   if (!content) return "";
   if (typeof content === "string") return content;
 
   // Handle array of content parts (multimodal format)
   if (Array.isArray(content)) {
     return content
-      .filter((part) => part && typeof part === "object" && "type" in part)
-      .map((part) => {
+      .map((part: ContentPart) => {
         if (part.type === "text" && part.text) {
           return part.text;
         }
