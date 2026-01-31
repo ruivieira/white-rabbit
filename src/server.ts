@@ -580,7 +580,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
       const promptTokens = body.messages.reduce(
         (acc, m) => acc + countWords(normalizeContent(m.content)),
-        0
+        0,
       );
       serverStats.promptTokens += promptTokens;
 
