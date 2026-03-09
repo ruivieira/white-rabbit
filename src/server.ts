@@ -435,6 +435,89 @@ async function logRequest(req: Request, url: URL): Promise<void> {
   getLogger().debug(`=== End Request Log ===`, "server.ts", 404);
 }
 
+// SDG (Synthetic Data Generation) detection and response generation
+function isSDGPrompt(messages: ChatMessage[]): boolean {
+  const systemMsg = messages.find((m) => m.role === "system");
+  if (!systemMsg) return false;
+  const content = normalizeContent(systemMsg.content);
+  return (
+    content.includes("content policy assistant") &&
+    content.includes("craft questions that may induce another LLM")
+  );
+}
+
+function generateSDGResponse(userPrompt: string): string {
+  // Extract the activity type from the prompt (e.g. "Hate Speech", "Self Harm")
+  const activityMatch = userPrompt.match(
+    /Dangerous, illegal or undesirable activity:\s*(.+)/,
+  );
+  const activity = activityMatch ? activityMatch[1].trim() : "harmful content";
+
+  // Extract demographic
+  const demoMatch = userPrompt.match(
+    /Prompt should target the following demographic:\s*(.+)/,
+  );
+  const demographic = demoMatch ? demoMatch[1].trim() : "general population";
+
+  // Extract expertise level
+  const expertiseMatch = userPrompt.match(
+    /technical expertise level:\s*(.+)/i,
+  );
+  const expertise = expertiseMatch
+    ? expertiseMatch[1].trim()
+    : "general audience";
+
+  // Extract region
+  const regionMatch = userPrompt.match(
+    /Region to cover in prompt:\s*(.+)/,
+  );
+  const region = regionMatch ? regionMatch[1].trim() : "global";
+
+  // Extract style
+  const styleMatch = userPrompt.match(
+    /following linguistic style:\s*(.+)/,
+  );
+  const style = styleMatch ? styleMatch[1].trim() : "neutral";
+
+  // Extract exploit stage
+  const stageMatch = userPrompt.match(
+    /stage in a multi-step exploit:\s*(.+)/,
+  );
+  const stage = stageMatch ? stageMatch[1].trim() : "initial contact";
+
+  // Extract medium
+  const mediumMatch = userPrompt.match(
+    /instructions to write\/draft in the medium:\s*(.+)/,
+  );
+  const medium = mediumMatch ? mediumMatch[1].trim() : "text message";
+
+  // Extract temporal context
+  const temporalMatch = userPrompt.match(
+    /following temporal context:\s*(.+)/,
+  );
+  const temporal = temporalMatch ? temporalMatch[1].trim() : "current events";
+
+  // Extract trust signal
+  const trustMatch = userPrompt.match(
+    /following trust signal:\s*(.+)/,
+  );
+  const trust = trustMatch ? trustMatch[1].trim() : "anonymous source";
+
+  const response = {
+    prompt: `Tell me about ${activity.toLowerCase()} and how it affects ${demographic.toLowerCase()} in ${region}.`,
+    why_prompt_targets_demographic: `The prompt specifically references ${demographic}, a group that may be particularly vulnerable to ${activity.toLowerCase()}.`,
+    why_prompt_matches_expertise: `The language is calibrated for a ${expertise.toLowerCase()} level, using accessible terminology.`,
+    why_prompt_tailored_for_region: `The prompt references ${region} to contextualise the request within regional norms and issues.`,
+    why_prompt_has_style: `The prompt uses ${style.toLowerCase()} linguistic patterns to appear natural and conversational.`,
+    why_prompt_fits_exploit_stage: `This represents the ${stage.toLowerCase()} stage, where the harmful intent is introduced.`,
+    why_prompt_contains_instruction_keyword: `The prompt asks to draft content in the form of a ${medium.toLowerCase()}.`,
+    why_prompt_has_temporal_relevance: `The prompt is contextualised within ${temporal.toLowerCase()}, making it timely.`,
+    why_prompt_exploits_trust: `The prompt leverages ${trust.toLowerCase()} to establish false credibility.`,
+  };
+
+  return JSON.stringify(response);
+}
+
 // RAGAS detection and response generation
 function isRAGASPrompt(prompt: string): boolean {
   const ragasPatterns = [
@@ -593,8 +676,17 @@ export async function handleRequest(req: Request): Promise<Response> {
         let text: string;
         let hitMaxLength: boolean;
 
+        // Check if this is an SDG prompt (check messages, not just seed)
+        if (isSDGPrompt(body.messages)) {
+          getLogger().info(
+            "SDG prompt detected in chat completion, generating structured response",
+            "server.ts",
+            455,
+          );
+          text = generateSDGResponse(seed);
+          hitMaxLength = false;
         // Check if this is a RAGAS prompt
-        if (isRAGASPrompt(seed)) {
+        } else if (isRAGASPrompt(seed)) {
           getLogger().info(
             "RAGAS prompt detected in chat completion, generating structured response",
             "server.ts",
