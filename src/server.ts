@@ -4,6 +4,7 @@ import { getVersionInfo } from "./version.ts";
 import { initLogger, LogLevel } from "./logger.ts";
 import {
   ChatCompletionsRequest,
+  ChatMessage,
   CompletionsRequest,
   ContentPart,
   DetokenizeRequest,
@@ -12,6 +13,9 @@ import {
   ModelsResponse,
   StatsResponse,
   TokenizeRequest,
+  ToolCall,
+  ToolChoice,
+  ToolDefinition,
 } from "./api.ts";
 
 // Function to get the current logger for this module
@@ -463,9 +467,7 @@ function generateSDGResponse(userPrompt: string): string {
   const expertiseMatch = userPrompt.match(
     /technical expertise level:\s*(.+)/i,
   );
-  const expertise = expertiseMatch
-    ? expertiseMatch[1].trim()
-    : "general audience";
+  const expertise = expertiseMatch ? expertiseMatch[1].trim() : "general audience";
 
   // Extract region
   const regionMatch = userPrompt.match(
@@ -504,15 +506,24 @@ function generateSDGResponse(userPrompt: string): string {
   const trust = trustMatch ? trustMatch[1].trim() : "anonymous source";
 
   const response = {
-    prompt: `Tell me about ${activity.toLowerCase()} and how it affects ${demographic.toLowerCase()} in ${region}.`,
-    why_prompt_targets_demographic: `The prompt specifically references ${demographic}, a group that may be particularly vulnerable to ${activity.toLowerCase()}.`,
-    why_prompt_matches_expertise: `The language is calibrated for a ${expertise.toLowerCase()} level, using accessible terminology.`,
-    why_prompt_tailored_for_region: `The prompt references ${region} to contextualise the request within regional norms and issues.`,
-    why_prompt_has_style: `The prompt uses ${style.toLowerCase()} linguistic patterns to appear natural and conversational.`,
-    why_prompt_fits_exploit_stage: `This represents the ${stage.toLowerCase()} stage, where the harmful intent is introduced.`,
-    why_prompt_contains_instruction_keyword: `The prompt asks to draft content in the form of a ${medium.toLowerCase()}.`,
-    why_prompt_has_temporal_relevance: `The prompt is contextualised within ${temporal.toLowerCase()}, making it timely.`,
-    why_prompt_exploits_trust: `The prompt leverages ${trust.toLowerCase()} to establish false credibility.`,
+    prompt:
+      `Tell me about ${activity.toLowerCase()} and how it affects ${demographic.toLowerCase()} in ${region}.`,
+    why_prompt_targets_demographic:
+      `The prompt specifically references ${demographic}, a group that may be particularly vulnerable to ${activity.toLowerCase()}.`,
+    why_prompt_matches_expertise:
+      `The language is calibrated for a ${expertise.toLowerCase()} level, using accessible terminology.`,
+    why_prompt_tailored_for_region:
+      `The prompt references ${region} to contextualise the request within regional norms and issues.`,
+    why_prompt_has_style:
+      `The prompt uses ${style.toLowerCase()} linguistic patterns to appear natural and conversational.`,
+    why_prompt_fits_exploit_stage:
+      `This represents the ${stage.toLowerCase()} stage, where the harmful intent is introduced.`,
+    why_prompt_contains_instruction_keyword:
+      `The prompt asks to draft content in the form of a ${medium.toLowerCase()}.`,
+    why_prompt_has_temporal_relevance:
+      `The prompt is contextualised within ${temporal.toLowerCase()}, making it timely.`,
+    why_prompt_exploits_trust:
+      `The prompt leverages ${trust.toLowerCase()} to establish false credibility.`,
   };
 
   return JSON.stringify(response);
@@ -612,6 +623,247 @@ function generateRAGASResponse(prompt: string): string {
   );
 }
 
+// --- Tool calling support ---
+
+/**
+ * Generate a value conforming to a JSON Schema property.
+ * Handles string, number, integer, boolean, array, object, and enum types.
+ */
+function generateValueFromSchema(schema: Record<string, unknown>, propName: string): unknown {
+  // Handle enum — pick a random value
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    return schema.enum[Math.floor(Math.random() * schema.enum.length)];
+  }
+
+  // Handle const
+  if ("const" in schema) {
+    return schema.const;
+  }
+
+  // Handle anyOf / oneOf — pick first variant
+  const variants = (schema.anyOf ?? schema.oneOf) as Record<string, unknown>[] | undefined;
+  if (Array.isArray(variants) && variants.length > 0) {
+    const nonNull = variants.filter((v) => v.type !== "null");
+    const picked = nonNull.length > 0 ? nonNull[0] : variants[0];
+    return generateValueFromSchema(picked, propName);
+  }
+
+  const type = schema.type as string | undefined;
+
+  switch (type) {
+    case "string": {
+      if (schema.format === "date") return "2025-01-15";
+      if (schema.format === "date-time") return "2025-01-15T10:30:00Z";
+      if (schema.format === "email") return "user@example.com";
+      if (schema.format === "uri" || schema.format === "url") return "https://example.com";
+      // Use default if provided
+      if (schema.default !== undefined) return schema.default;
+      // Generate a contextual placeholder based on property name
+      return generatePlaceholderString(propName);
+    }
+    case "number":
+    case "float":
+    case "double": {
+      if (schema.default !== undefined) return schema.default;
+      const min = (schema.minimum as number) ?? 0;
+      const max = (schema.maximum as number) ?? 100;
+      return Math.round((min + Math.random() * (max - min)) * 100) / 100;
+    }
+    case "integer": {
+      if (schema.default !== undefined) return schema.default;
+      const imin = (schema.minimum as number) ?? 0;
+      const imax = (schema.maximum as number) ?? 10;
+      return Math.floor(imin + Math.random() * (imax - imin + 1));
+    }
+    case "boolean": {
+      if (schema.default !== undefined) return schema.default;
+      return Math.random() > 0.5;
+    }
+    case "array": {
+      const itemSchema = schema.items as Record<string, unknown> | undefined;
+      const minItems = (schema.minItems as number) ?? 1;
+      const maxItems = (schema.maxItems as number) ?? 2;
+      const count = Math.floor(minItems + Math.random() * (maxItems - minItems + 1));
+      if (!itemSchema) return [];
+      return Array.from(
+        { length: count },
+        (_, i) => generateValueFromSchema(itemSchema, `${propName}_${i}`),
+      );
+    }
+    case "object": {
+      const props = schema.properties as Record<string, Record<string, unknown>> | undefined;
+      if (!props) return {};
+      const required = (schema.required as string[]) ?? Object.keys(props);
+      const result: Record<string, unknown> = {};
+      for (const [key, propSchema] of Object.entries(props)) {
+        if (required.includes(key) || Math.random() > 0.7) {
+          result[key] = generateValueFromSchema(propSchema, key);
+        }
+      }
+      return result;
+    }
+    default:
+      // Fallback for untyped schemas — if properties exist, treat as object
+      if (schema.properties) {
+        return generateValueFromSchema({ ...schema, type: "object" }, propName);
+      }
+      return generatePlaceholderString(propName);
+  }
+}
+
+/**
+ * Generate a plausible placeholder string based on the property name.
+ */
+function generatePlaceholderString(propName: string): string {
+  const lower = propName.toLowerCase();
+  if (lower.includes("email")) return "user@example.com";
+  if (lower.includes("name") || lower.includes("title")) return "Test Item";
+  if (lower.includes("subject")) return "Regarding your request";
+  if (lower.includes("body") || lower.includes("message") || lower.includes("content")) {
+    return "This is a test message.";
+  }
+  if (lower.includes("query") || lower.includes("search")) return "meeting notes";
+  if (lower.includes("date")) return "2025-01-15";
+  if (lower.includes("time")) return "10:30";
+  if (lower.includes("id")) return "item_" + Math.floor(Math.random() * 1000);
+  if (lower.includes("url") || lower.includes("link")) return "https://example.com";
+  if (lower.includes("path") || lower.includes("file")) return "/documents/file.txt";
+  if (lower.includes("address")) return "123 Main Street";
+  if (lower.includes("city")) return "London";
+  if (lower.includes("country")) return "UK";
+  if (lower.includes("phone")) return "+44 20 7946 0958";
+  if (lower.includes("amount") || lower.includes("price")) return "42.00";
+  if (lower.includes("description")) return "A sample item for testing";
+  if (lower.includes("recipient") || lower.includes("to")) return "recipient@example.com";
+  if (lower.includes("sender") || lower.includes("from")) return "sender@example.com";
+  return `test_${propName}`;
+}
+
+/**
+ * Generate arguments for a tool function based on its JSON Schema parameters.
+ */
+function generateToolArguments(tool: ToolDefinition): string {
+  const params = tool.function.parameters as Record<string, unknown> | undefined;
+  if (!params || !params.properties) return "{}";
+
+  const properties = params.properties as Record<string, Record<string, unknown>>;
+  const required = (params.required as string[]) ?? [];
+  const result: Record<string, unknown> = {};
+
+  for (const [key, propSchema] of Object.entries(properties)) {
+    // Always include required params, include optional ones 30% of the time
+    if (required.includes(key) || Math.random() < 0.3) {
+      result[key] = generateValueFromSchema(propSchema, key);
+    }
+  }
+
+  return JSON.stringify(result);
+}
+
+/**
+ * Generate a unique tool call ID.
+ */
+function toolCallId(): string {
+  return "call_" + uuidHex().substring(0, 24);
+}
+
+/**
+ * Determine whether the model should respond with tool calls or text,
+ * and if tool calls, which tools to call.
+ *
+ * Handles all tool_choice variants:
+ *   - "none": always text
+ *   - "required": always tool calls
+ *   - "auto": heuristic based on conversation state
+ *   - {type: "function", function: {name: "X"}}: call that specific function
+ */
+function resolveToolCalls(
+  tools: ToolDefinition[],
+  toolChoice: ToolChoice | undefined,
+  messages: ChatMessage[],
+  parallelToolCalls: boolean,
+): ToolCall[] | null {
+  if (!tools || tools.length === 0) return null;
+
+  const choice = toolChoice ?? "auto";
+
+  // "none" — never call tools
+  if (choice === "none") return null;
+
+  // Specific function requested
+  if (typeof choice === "object" && choice.type === "function") {
+    const targetName = choice.function.name;
+    const target = tools.find((t) => t.function.name === targetName);
+    if (!target) return null;
+    return [{
+      id: toolCallId(),
+      type: "function",
+      function: {
+        name: target.function.name,
+        arguments: generateToolArguments(target),
+      },
+    }];
+  }
+
+  // Count how many rounds of tool calling have occurred
+  const toolResultCount = messages.filter((m) => m.role === "tool").length;
+  const assistantToolCallCount = messages.filter(
+    (m) => m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0,
+  ).length;
+
+  // "required" — must call at least one tool
+  if (choice === "required") {
+    return pickToolCalls(tools, parallelToolCalls);
+  }
+
+  // "auto" — decide based on conversation state
+  //
+  // Heuristic:
+  //   - No prior tool calls → 95% chance to call tools (first turn)
+  //   - 1-2 rounds of tool results → 60% chance to call again
+  //   - 3+ rounds → 20% chance (likely time to wrap up)
+  //   - Last message is NOT a tool result → respond with text
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage && lastMessage.role !== "user" && lastMessage.role !== "tool") {
+    return null;
+  }
+
+  let callProbability: number;
+  if (assistantToolCallCount === 0) {
+    callProbability = 0.95;
+  } else if (toolResultCount <= 4) {
+    callProbability = 0.6;
+  } else if (toolResultCount <= 8) {
+    callProbability = 0.3;
+  } else {
+    callProbability = 0.1;
+  }
+
+  if (Math.random() > callProbability) return null;
+
+  return pickToolCalls(tools, parallelToolCalls);
+}
+
+/**
+ * Pick 1-3 tools to call from the available tools.
+ */
+function pickToolCalls(tools: ToolDefinition[], parallel: boolean): ToolCall[] {
+  const maxCalls = parallel ? Math.min(tools.length, 1 + Math.floor(Math.random() * 3)) : 1;
+
+  // Shuffle and pick
+  const shuffled = [...tools].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, maxCalls);
+
+  return selected.map((tool) => ({
+    id: toolCallId(),
+    type: "function" as const,
+    function: {
+      name: tool.function.name,
+      arguments: generateToolArguments(tool),
+    },
+  }));
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   let url: URL;
   try {
@@ -660,6 +912,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       const n = body.n ?? 1;
       const maxTokens = body.max_tokens ?? null;
       const wantLogprobs = Boolean(body.logprobs);
+      const parallelToolCalls = body.parallel_tool_calls ?? true;
 
       const promptTokens = body.messages.reduce(
         (acc, m) => acc + countWords(normalizeContent(m.content)),
@@ -667,60 +920,96 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
       serverStats.promptTokens += promptTokens;
 
+      // Check if we should respond with tool calls
+      const toolCalls = body.tools
+        ? resolveToolCalls(body.tools, body.tool_choice, body.messages, parallelToolCalls)
+        : null;
+
       const choices: unknown[] = [];
       let generatedTokens = 0;
 
-      for (let i = 0; i < n; i++) {
-        const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
-        const seed = normalizeContent(lastUser?.content);
-        let text: string;
-        let hitMaxLength: boolean;
+      if (toolCalls && toolCalls.length > 0) {
+        // Tool call response
+        const toolNames = toolCalls.map((tc) => tc.function.name).join(", ");
+        getLogger().info(
+          `Tool call response: ${toolCalls.length} call(s) [${toolNames}]`,
+          "server.ts",
+          450,
+        );
 
-        // Check if this is an SDG prompt (check messages, not just seed)
-        if (isSDGPrompt(body.messages)) {
-          getLogger().info(
-            "SDG prompt detected in chat completion, generating structured response",
-            "server.ts",
-            455,
-          );
-          text = generateSDGResponse(seed);
-          hitMaxLength = false;
-        // Check if this is a RAGAS prompt
-        } else if (isRAGASPrompt(seed)) {
-          getLogger().info(
-            "RAGAS prompt detected in chat completion, generating structured response",
-            "server.ts",
-            460,
-          );
-          text = generateRAGASResponse(seed);
-          hitMaxLength = false;
-        } else {
-          ({ text, hitMaxLength } = await generateCorpusMarkovAnswer(seed, maxTokens));
-          if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
-        }
+        // Estimate tokens from the serialised tool call arguments
+        const toolTokens = toolCalls.reduce(
+          (acc, tc) => acc + countWords(tc.function.arguments) + 3,
+          0,
+        );
+        generatedTokens += toolTokens;
+        serverStats.generationTokens += toolTokens;
 
-        let logprobs: {
-          content: Array<
-            { token: string; logprob: number; bytes: unknown[]; top_logprobs: unknown[] }
-          >;
-        } | null = null;
-        if (wantLogprobs) {
-          logprobs = { content: [] };
-          for (const word of text.split(/\s+/)) {
-            const lp = -Math.random();
-            logprobs.content.push({ token: word, logprob: lp, bytes: [], top_logprobs: [] });
-          }
-        }
-
-        const tokensInResponse = text.trim().length ? text.trim().split(/\s+/).length : 0;
-        generatedTokens += tokensInResponse;
-        serverStats.generationTokens += tokensInResponse;
         choices.push({
-          index: i,
-          message: { role: "assistant", content: text, refusal: null },
-          logprobs,
-          finish_reason: hitMaxLength ? "length" : "stop",
+          index: 0,
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: toolCalls,
+            refusal: null,
+          },
+          logprobs: null,
+          finish_reason: "tool_calls",
         });
+      } else {
+        // Standard text response (existing logic)
+        for (let i = 0; i < n; i++) {
+          const lastUser = [...body.messages].reverse().find((m) => m.role === "user");
+          const seed = normalizeContent(lastUser?.content);
+          let text: string;
+          let hitMaxLength: boolean;
+
+          // Check if this is an SDG prompt (check messages, not just seed)
+          if (isSDGPrompt(body.messages)) {
+            getLogger().info(
+              "SDG prompt detected in chat completion, generating structured response",
+              "server.ts",
+              455,
+            );
+            text = generateSDGResponse(seed);
+            hitMaxLength = false;
+            // Check if this is a RAGAS prompt
+          } else if (isRAGASPrompt(seed)) {
+            getLogger().info(
+              "RAGAS prompt detected in chat completion, generating structured response",
+              "server.ts",
+              460,
+            );
+            text = generateRAGASResponse(seed);
+            hitMaxLength = false;
+          } else {
+            ({ text, hitMaxLength } = await generateCorpusMarkovAnswer(seed, maxTokens));
+            if (!text) ({ text, hitMaxLength } = genParagraph(maxTokens));
+          }
+
+          let logprobs: {
+            content: Array<
+              { token: string; logprob: number; bytes: unknown[]; top_logprobs: unknown[] }
+            >;
+          } | null = null;
+          if (wantLogprobs) {
+            logprobs = { content: [] };
+            for (const word of text.split(/\s+/)) {
+              const lp = -Math.random();
+              logprobs.content.push({ token: word, logprob: lp, bytes: [], top_logprobs: [] });
+            }
+          }
+
+          const tokensInResponse = text.trim().length ? text.trim().split(/\s+/).length : 0;
+          generatedTokens += tokensInResponse;
+          serverStats.generationTokens += tokensInResponse;
+          choices.push({
+            index: i,
+            message: { role: "assistant", content: text, refusal: null },
+            logprobs,
+            finish_reason: hitMaxLength ? "length" : "stop",
+          });
+        }
       }
 
       const resp = {

@@ -665,3 +665,346 @@ Deno.test("Request logging - handles malformed JSON gracefully", async () => {
     console.error = originalError;
   }
 });
+
+// --- Tool calling tests ---
+
+const sampleTools = [
+  {
+    type: "function" as const,
+    function: {
+      name: "search_emails",
+      description: "Search for emails matching a query",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "integer", description: "Max results", default: 10 },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "send_email",
+      description: "Send an email",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Recipient email" },
+          subject: { type: "string", description: "Subject line" },
+          body: { type: "string", description: "Email body" },
+        },
+        required: ["to", "subject", "body"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_calendar_events",
+      description: "Get calendar events for a date",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", format: "date", description: "Date to query" },
+          calendar_id: { type: "string", description: "Calendar ID" },
+        },
+        required: ["date"],
+      },
+    },
+  },
+];
+
+Deno.test("Tool calling - tools present generates tool_calls response", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Search for meeting notes" }],
+    tools: sampleTools,
+    tool_choice: "required" as const,
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+  const data = await response.json();
+  const choice = data.choices[0];
+
+  assertEquals(choice.finish_reason, "tool_calls");
+  assert(choice.message.tool_calls.length > 0, "Should have at least one tool call");
+  assertEquals(choice.message.content, null);
+  assertEquals(choice.message.role, "assistant");
+
+  const tc = choice.message.tool_calls[0];
+  assert(tc.id.startsWith("call_"), "Tool call ID should start with 'call_'");
+  assertEquals(tc.type, "function");
+  assert(typeof tc.function.name === "string");
+  assert(typeof tc.function.arguments === "string");
+
+  // Arguments should be valid JSON
+  const args = JSON.parse(tc.function.arguments);
+  assert(typeof args === "object");
+});
+
+Deno.test("Tool calling - tool_choice 'none' returns text", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Hello" }],
+    tools: sampleTools,
+    tool_choice: "none" as const,
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+  const data = await response.json();
+  const choice = data.choices[0];
+
+  assert(choice.message.content !== null, "Should have text content");
+  assert(!choice.message.tool_calls, "Should not have tool_calls");
+  assert(choice.finish_reason === "stop" || choice.finish_reason === "length");
+});
+
+Deno.test("Tool calling - specific function choice", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Send an email" }],
+    tools: sampleTools,
+    tool_choice: { type: "function", function: { name: "send_email" } },
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+  const data = await response.json();
+  const choice = data.choices[0];
+
+  assertEquals(choice.finish_reason, "tool_calls");
+  assertEquals(choice.message.tool_calls.length, 1);
+  assertEquals(choice.message.tool_calls[0].function.name, "send_email");
+
+  // Check that required arguments are present
+  const args = JSON.parse(choice.message.tool_calls[0].function.arguments);
+  assertExists(args.to, "Required param 'to' should be present");
+  assertExists(args.subject, "Required param 'subject' should be present");
+  assertExists(args.body, "Required param 'body' should be present");
+});
+
+Deno.test("Tool calling - no tools returns normal text response", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Hello world" }],
+    max_tokens: 20,
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  assertEquals(response.status, 200);
+  const data = await response.json();
+  const choice = data.choices[0];
+
+  assert(choice.message.content !== null);
+  assert(!choice.message.tool_calls);
+});
+
+Deno.test("Tool calling - multi-turn with tool results eventually returns text", async () => {
+  const messages: Record<string, unknown>[] = [
+    { role: "user", content: "Search for meeting notes and send them to Bob" },
+  ];
+
+  // Add 10 rounds of fake tool call history to push probability towards text
+  for (let i = 0; i < 10; i++) {
+    messages.push({
+      role: "assistant",
+      content: null,
+      tool_calls: [{
+        id: `call_fake_${i}`,
+        type: "function",
+        function: { name: "search_emails", arguments: '{"query":"meeting"}' },
+      }],
+    });
+    messages.push({
+      role: "tool",
+      tool_call_id: `call_fake_${i}`,
+      content: JSON.stringify({ results: [] }),
+    });
+  }
+
+  const requestBody = {
+    model: "test-model",
+    messages,
+    tools: sampleTools,
+    tool_choice: "auto" as const,
+  };
+
+  // After 10 rounds, the probability of calling tools is very low (10%)
+  // Run multiple times to verify at least one returns text
+  let gotText = false;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const response = await makeTestRequest("/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    });
+    const data = await response.json();
+    if (data.choices[0].finish_reason !== "tool_calls") {
+      gotText = true;
+      break;
+    }
+  }
+  assert(gotText, "After 10 tool rounds, should eventually return text within 20 attempts");
+});
+
+Deno.test("Tool calling - generated arguments match schema types", async () => {
+  const tools = [{
+    type: "function" as const,
+    function: {
+      name: "create_event",
+      description: "Create a calendar event",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          date: { type: "string", format: "date" },
+          duration_minutes: { type: "integer", minimum: 15, maximum: 480 },
+          is_recurring: { type: "boolean" },
+          attendees: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+            maxItems: 3,
+          },
+        },
+        required: ["title", "date", "duration_minutes"],
+      },
+    },
+  }];
+
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Create an event" }],
+    tools,
+    tool_choice: { type: "function", function: { name: "create_event" } },
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  const data = await response.json();
+  const args = JSON.parse(data.choices[0].message.tool_calls[0].function.arguments);
+
+  // Required fields must be present
+  assert(typeof args.title === "string", "title should be a string");
+  assert(typeof args.date === "string", "date should be a string");
+  assert(typeof args.duration_minutes === "number", "duration_minutes should be a number");
+  assert(
+    Number.isInteger(args.duration_minutes),
+    "duration_minutes should be an integer",
+  );
+
+  // Optional fields, if present, should have correct types
+  if ("is_recurring" in args) {
+    assert(typeof args.is_recurring === "boolean", "is_recurring should be boolean");
+  }
+  if ("attendees" in args) {
+    assert(Array.isArray(args.attendees), "attendees should be an array");
+    for (const a of args.attendees) {
+      assert(typeof a === "string", "each attendee should be a string");
+    }
+  }
+});
+
+Deno.test("Tool calling - enum parameters pick valid values", async () => {
+  const tools = [{
+    type: "function" as const,
+    function: {
+      name: "set_priority",
+      description: "Set task priority",
+      parameters: {
+        type: "object",
+        properties: {
+          priority: { type: "string", enum: ["low", "medium", "high", "critical"] },
+          task_id: { type: "string" },
+        },
+        required: ["priority", "task_id"],
+      },
+    },
+  }];
+
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Set priority" }],
+    tools,
+    tool_choice: { type: "function", function: { name: "set_priority" } },
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  const data = await response.json();
+  const args = JSON.parse(data.choices[0].message.tool_calls[0].function.arguments);
+
+  assert(
+    ["low", "medium", "high", "critical"].includes(args.priority),
+    `priority should be one of the enum values, got: ${args.priority}`,
+  );
+});
+
+Deno.test("Tool calling - parallel_tool_calls=false returns single call", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Do things" }],
+    tools: sampleTools,
+    tool_choice: "required" as const,
+    parallel_tool_calls: false,
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  const data = await response.json();
+  assertEquals(
+    data.choices[0].message.tool_calls.length,
+    1,
+    "With parallel_tool_calls=false, should return exactly 1 tool call",
+  );
+});
+
+Deno.test("Tool calling - usage field present in tool call response", async () => {
+  const requestBody = {
+    model: "test-model",
+    messages: [{ role: "user", content: "Search" }],
+    tools: sampleTools,
+    tool_choice: "required" as const,
+  };
+
+  const response = await makeTestRequest("/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+
+  const data = await response.json();
+  assertExists(data.usage);
+  assert(typeof data.usage.prompt_tokens === "number");
+  assert(typeof data.usage.completion_tokens === "number");
+  assert(typeof data.usage.total_tokens === "number");
+  assert(data.usage.total_tokens === data.usage.prompt_tokens + data.usage.completion_tokens);
+});
