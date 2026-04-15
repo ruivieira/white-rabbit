@@ -15,13 +15,46 @@ export interface ContentPart {
   };
 }
 
+export interface ToolFunction {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ToolDefinition {
+  type: "function";
+  function: ToolFunction;
+}
+
+export interface ToolCallFunction {
+  name: string;
+  arguments: string;
+}
+
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: ToolCallFunction;
+}
+
 export interface ChatMessage {
   role: string;
-  content: string | ContentPart[];
+  content: string | ContentPart[] | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
 }
+
+export type ToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "function"; function: { name: string } };
 
 export interface ChatCompletionsRequest extends BaseCompletionsRequest {
   messages: ChatMessage[];
+  tools?: ToolDefinition[];
+  tool_choice?: ToolChoice;
+  parallel_tool_calls?: boolean;
 }
 
 export interface CompletionsRequest extends BaseCompletionsRequest {
